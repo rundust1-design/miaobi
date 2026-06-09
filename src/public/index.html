@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>妙笔 — AI 长篇小说创作引擎</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+:root {
+  --bg: #0f1117; --surface: #1a1d27; --surface2: #22252f; --border: #2a2d37;
+  --text: #e1e4ea; --text2: #9498a3; --accent: #7c5cfc; --accent2: #a78bfa;
+  --green: #34d399; --red: #f87171; --radius: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box }
+body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; }
+.sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-header { padding: 20px 16px; border-bottom: 1px solid var(--border); }
+.sidebar-header h1 { font-size: 20px; color: var(--accent2); letter-spacing: 2px; }
+.sidebar-header p { font-size: 11px; color: var(--text2); margin-top: 4px; }
+.sidebar-nav { flex:1; padding: 8px 0; display: flex; flex-direction: column; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; color: var(--text2); font-size: 14px; border-left: 3px solid transparent; }
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: var(--surface2); color: var(--accent2); border-left-color: var(--accent); }
+.nav-item .icon { font-size: 18px; width: 24px; text-align: center; }
+.nav-spacer { flex:1; }
+.main { flex:1; display: flex; flex-direction: column; overflow: hidden; }
+.topbar { padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; background: var(--surface); flex-shrink: 0; }
+.topbar .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.topbar .dot.green { background: var(--green); }
+.topbar .dot.red { background: var(--red); }
+.topbar .status-text { font-size: 13px; }
+.panel { display: none; }
+.panel.active { display: block; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.card h3 { font-size: 14px; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group.full { grid-column: 1/-1; }
+.form-group label { font-size: 12px; color: var(--text2); font-weight: 500; }
+.form-group input, .form-group textarea, .form-group select { padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; font-family: inherit; resize: vertical; }
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+.form-group textarea { min-height: 80px; }
+.btn { padding: 8px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+.btn-green { background: var(--green); color: #000; }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.step-checks { display: flex; gap: 12px; flex-wrap: wrap; }
+.step-checks label { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; padding: 6px 12px; background: var(--surface2); border-radius: 6px; border: 1px solid var(--border); }
+.step-checks label:hover { border-color: var(--accent); }
+.step-checks input:checked + span { color: var(--accent2); }
+.bp-list { max-height: 300px; overflow-y: auto; }
+.bp-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+.bp-item:hover { background: var(--surface2); }
+.bp-item .num { color: var(--accent2); font-weight: 600; min-width: 50px; }
+.bp-item .title { flex:1; }
+.bp-item .role { color: var(--text2); font-size: 11px; padding: 2px 8px; background: var(--surface2); border-radius: 4px; }
+.toast { position: fixed; top: 16px; right: 16px; padding: 12px 20px; border-radius: var(--radius); font-size: 14px; z-index: 100; animation: fadeIn 0.3s; }
+.toast.success { background: var(--green); color: #000; }
+.toast.error { background: var(--red); color: #fff; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; } }
+
+/* Bottom Split Panel */
+.bottom-panel { position: fixed; bottom: 0; left: 220px; right: 0; height: 320px; display: flex; z-index: 10; border-top: 1px solid var(--border); }
+.log-side { width: 16.66%; min-width: 200px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.log-side .log-hdr { padding: 6px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text2); flex-shrink: 0; }
+.log-side .log-body { flex:1; overflow-y: auto; padding: 6px 12px; font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.5; }
+.log-side .log-body .line { padding: 1px 0; white-space: pre-wrap; word-break: break-all; }
+.log-side .log-body .step { color: var(--accent2); font-weight: bold; }
+.log-side .log-body .done { color: var(--green); }
+.log-side .log-body .error { color: var(--red); }
+.log-side .log-body .info { color: var(--text2); }
+.content-side { flex:1; background: #0d1115; display: flex; flex-direction: column; }
+.content-side .content-hdr { padding: 6px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text2); flex-shrink: 0; background: var(--surface); }
+.content-side .content-body { flex:1; overflow-y: auto; padding: 16px 24px; font-size: 15px; line-height: 2; color: #c9d1d9; white-space: pre-wrap; }
+.content-body .cursor { display: inline; animation: blink 0.8s infinite; color: var(--accent2); }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+.content-body .thinking { color: #6e7681; font-style: italic; }
+.main-content { flex:1; overflow-y: auto; padding-bottom: 324px; }
+.main-content .content { padding: 24px; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header"><h1>妙笔</h1><p>AI 写作引擎</p></div>
+  <div class="sidebar-nav">
+    <div class="nav-item active" data-panel="config"><span class="icon">⚙️</span><span>项目配置</span></div>
+    <div class="nav-item" data-panel="architect"><span class="icon">🏗️</span><span>故事架构</span></div>
+    <div class="nav-item" data-panel="blueprint"><span class="icon">📋</span><span>章节蓝图</span></div>
+    <div class="nav-item" data-panel="write"><span class="icon">✍️</span><span>章节写作</span></div>
+    <div class="nav-item" data-panel="oneclick"><span class="icon">🚀</span><span>一键完成</span></div>
+    <div class="nav-item" data-panel="post"><span class="icon">🔧</span><span>修/审/定</span></div>
+    <div class="nav-spacer"></div>
+    <div class="nav-item" data-panel="settings"><span class="icon">🔌</span><span>LLM 设置</span></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <span style="font-size:12px;color:var(--text2);flex-shrink:0">📂 最近项目</span> <select id="projectSelect" onchange="switchProject(this.value)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;min-width:340px" title="选择历史项目"><option value="">（选择项目）</option></select>
+    <button class="btn btn-secondary" onclick="showNewProjectDialog()" style="padding:4px 10px;font-size:11px;flex-shrink:0">+ 新建</button>
+    <span style="font-size:13px;color:var(--text2)">|</span>
+    <div style="display:flex;align-items:center;gap:6px"><span id="statusDot" class="dot red"></span><span id="statusText" class="status-text">检查中...</span></div>
+    <span style="font-size:13px;color:var(--text2)">|</span>
+    <span id="projectInfo" style="font-size:12px;color:var(--text2)"></span>
+    <span style="flex:1"></span>
+    <span id="stepIndicator" style="font-size:12px;color:var(--accent2);display:none"></span>
+  </div>
+
+  <div class="main-content">
+    <div class="content">
+
+      <!-- Settings Panel -->
+      <div id="panel-settings" class="panel">
+        <div class="card" style="border-color: var(--accent);">
+          <h3>🔌 大模型连接设置</h3>
+          <p style="color:var(--text2);font-size:13px;margin-bottom:16px">修改后即时生效，无需重启服务器</p>
+          <div class="form-grid">
+            <div class="form-group full"><label>API 地址 (Base URL)</label><input id="settings-baseUrl" placeholder="https://api.openai.com/v1"></div>
+            <div class="form-group full"><label>API 密钥</label>
+              <div style="display:flex;gap:8px">
+                <input id="settings-apiKey" type="password" placeholder="sk-..." style="flex:1">
+                <button class="btn btn-secondary" onclick="toggleApiKey()" title="显示/隐藏">👁</button>
+              </div>
+            </div>
+            <div class="form-group"><label>模型名称</label><input id="settings-model" placeholder="deepseek-v4-pro"></div>
+            <div class="form-group"><label>每章默认字数</label><input id="settings-wordsPerChapter" type="number" value="3000" min="500" max="20000"></div>
+            <div class="form-group"><label>默认总章数</label><input id="settings-totalChapters" type="number" value="100" min="10" max="5000"></div>
+          </div>
+          <div class="btn-group" style="margin-top:12px">
+            <button class="btn btn-primary" onclick="saveSettings()">保存设置</button>
+            <button class="btn btn-secondary" onclick="loadSettings()">重新加载</button>
+            <span id="settingsStatus" style="font-size:12px;color:var(--text2)"></span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>连接状态</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px" id="settings-info"></div>
+        </div>
+      </div>
+
+      <!-- Config Panel -->
+      <div id="panel-config" class="panel active">
+        <div class="card">
+          <h3>已生成配置 <span id="config-exists-badge" style="font-size:12px;color:var(--text2);display:none"></span></h3>
+          <div id="config-display" style="display:none">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:12px" id="config-short"></div>
+            <details style="margin-bottom:12px"><summary style="cursor:pointer;color:var(--accent2);font-size:13px">📖 展开查看全部配置</summary>
+              <div id="config-full" style="margin-top:8px;font-size:13px"></div>
+            </details>
+          </div>
+          <div id="config-empty" style="color:var(--text2);font-size:13px;padding:8px 0">暂无配置数据，请使用下方表单生成。</div>
+        </div>
+        <div class="card">
+          <h3>一键配置生成</h3>
+          <div class="form-group full" style="margin-bottom:12px">
+            <label>你的小说灵感/构思</label>
+            <textarea id="config-idea" placeholder="例如：一个废柴少年意外获得上古神器，从此逆天改命..." rows="3"></textarea>
+          </div>
+          <div class="form-grid">
+            <div class="form-group"><label>总章节数</label><input id="config-chapters" type="number" value="100" min="10" max="5000"></div>
+            <div class="form-group"><label>每章字数</label><input id="config-words" type="number" value="3000" min="1000" max="20000"></div>
+          </div>
+          <div class="btn-group" style="margin-top:12px">
+            <button class="btn btn-primary" onclick="generateConfig()">开始生成配置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Architect Panel -->
+      <div id="panel-architect" class="panel">
+        <div class="card" id="architect-display-card" style="display:none">
+          <h3>已生成架构 <span id="architect-status" style="font-size:12px;color:var(--text2)"></span></h3>
+          <div id="architect-display"></div>
+          <button class="btn btn-primary" onclick="extractCharacters()" style="margin-top:12px">📇 从角色图谱提取角色卡</button>
+        </div>
+        <div class="card">
+          <h3>故事架构四步生成</h3>
+          <div class="step-checks" style="margin-bottom:16px">
+            <label><input type="checkbox" checked id="step-premise"><span>1. 故事前提</span></label>
+            <label><input type="checkbox" checked id="step-characters"><span>2. 角色图谱</span></label>
+            <label><input type="checkbox" checked id="step-world"><span>3. 世界观矩阵</span></label>
+            <label><input type="checkbox" checked id="step-synopsis"><span>4. 情节大纲</span></label>
+          </div>
+          <div class="form-group full" style="margin-bottom:12px">
+            <label>每步微操指导 (JSON，可选)</label>
+            <textarea id="architect-guidance" placeholder='{"premise":"重点突出主角身世"}' rows="2"></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="generateArchitecture()">开始生成架构</button>
+        </div>
+      </div>
+
+      <!-- Blueprint Panel -->
+      <div id="panel-blueprint" class="panel">
+        <div class="card">
+          <h3>章节蓝图生成</h3>
+          <div class="form-grid" style="margin-bottom:12px">
+            <div class="form-group"><label>模式</label><select id="bp-mode"><option value="full">全部重新生成</option><option value="append">追加续写</option></select></div>
+            <div class="form-group"><label>起始章号</label><input id="bp-start" type="number" placeholder="自动" min="1"></div>
+            <div class="form-group"><label>生成章数</label><input id="bp-count" type="number" placeholder="默认到总章数" min="1"></div>
+            <div class="form-group"><label>节奏指导</label><input id="bp-pacing" placeholder="每10章一小高潮"></div>
+          </div>
+          <button class="btn btn-primary" onclick="generateBlueprint()">生成蓝图</button>
+        </div>
+        <div class="card">
+          <h3>已有蓝图 <span id="bp-total" style="color:var(--accent2);font-size:12px"></span></h3>
+          <div class="bp-list" id="bp-list"><span style="color:var(--text2)">加载中...</span></div>
+        </div>
+      </div>
+
+      <!-- Write Panel -->
+      <div id="panel-write" class="panel">
+        <div class="card">
+          <h3>撰写章节草稿</h3>
+          <div class="form-grid">
+            <div class="form-group"><label>章节号</label><input id="write-ch" type="number" min="1" placeholder="1"></div>
+            <div class="form-group"><label>章标题</label><input id="write-title" placeholder="留空从蓝图读取"></div>
+            <div class="form-group"><label>章角色</label><input id="write-role" value="发展" placeholder="发展/高潮/转折"></div>
+            <div class="form-group"><label>悬念钩子</label><input id="write-hook" placeholder="上章悬念"></div>
+            <div class="form-group full"><label>章目的</label><input id="write-purpose" placeholder="本章推进什么"></div>
+            <div class="form-group full"><label>关键事件</label><input id="write-events" placeholder="本章关键事件"></div>
+            <div class="form-group full"><label>角色列表</label><input id="write-chars" placeholder="逗号分隔"></div>
+            <div class="form-group full"><label>微操指导</label><textarea id="write-guidance" placeholder="本章特殊要求" rows="2"></textarea></div>
+          </div>
+          <div class="btn-group" style="margin-top:12px">
+            <button class="btn btn-primary" onclick="writeChapter()">开始写稿</button>
+            <button class="btn btn-green" onclick="oneClickFromWrite()">一键完成本章</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- One-Click Panel -->
+      <div id="panel-oneclick" class="panel">
+        <div class="card" style="border-color: var(--accent);">
+          <h3>一键完成 — 写稿→修稿→审稿→修复→定稿</h3>
+          <p style="color:var(--text2);font-size:13px;margin-bottom:12px">5 步全自动，无需人工干预</p>
+          <div class="form-grid">
+            <div class="form-group"><label>章节号</label><input id="oc-ch" type="number" min="1" placeholder="1"></div>
+            <div class="form-group"><label>章标题</label><input id="oc-title" placeholder="留空从蓝图读取"></div>
+            <div class="form-group"><label>章角色</label><input id="oc-role" value="发展"></div>
+            <div class="form-group"><label>审稿聚焦</label><input id="oc-focus" placeholder="人设一致性"></div>
+            <div class="form-group full"><label>关键事件</label><input id="oc-events" placeholder="本章关键事件"></div>
+            <div class="form-group full"><label>角色列表</label><input id="oc-chars" placeholder="逗号分隔"></div>
+            <div class="form-group full"><label>微操指导</label><textarea id="oc-guidance" rows="2" placeholder="对本章的特殊要求"></textarea></div>
+          </div>
+          <button class="btn btn-green" style="margin-top:12px;font-size:16px;padding:12px 32px" onclick="oneClick()">一键完成</button>
+        </div>
+      </div>
+
+      <!-- Post Panel -->
+      <div id="panel-post" class="panel">
+        <div class="card">
+          <h3>单独操作</h3>
+          <div class="form-grid" style="margin-bottom:12px">
+            <div class="form-group"><label>章节号</label><input id="post-ch" type="number" min="1" placeholder="1"></div>
+            <div class="form-group"><label>章标题</label><input id="post-title" placeholder="留空自动读取"></div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-secondary" onclick="refineChapter()">AI 修稿</button>
+            <button class="btn btn-secondary" onclick="reviewChapter()">一致性审稿</button>
+            <button class="btn btn-primary" onclick="finalizeChapter()">定稿</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bottom Panel: Log (1/6) + Content (5/6) -->
+  <div class="bottom-panel" id="bottomPanel">
+    <div class="log-side">
+      <div class="log-hdr">
+        <span>📋 日志</span>
+        <span style="cursor:pointer;color:var(--accent2)" onclick="clearLogs()">清空</span>
+      </div>
+      <div class="log-body" id="logBody"><div class="line info">等待操作...</div></div>
+    </div>
+    <div class="content-side">
+      <div class="content-hdr">
+        <span>📝 生成内容</span>
+        <span id="contentWordCount" style="color:var(--text2)"></span>
+      </div>
+      <div class="content-body" id="contentBody">
+        <span style="color:var(--text2)">这里将实时显示 AI 生成的文本内容...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New Project Modal -->
+<div id="newProjectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center">
+  <div class="card" style="width:480px;max-height:90vh;overflow-y:auto">
+    <h3>📁 新建 / 打开项目</h3>
+    <div class="form-group full" style="margin-bottom:12px">
+      <label>项目名称</label>
+      <input id="newProjectName" placeholder="我的小说项目">
+    </div>
+    <div class="form-group full" style="margin-bottom:12px">
+      <label>项目目录</label>
+      <div style="display:flex;gap:8px">
+        <input id="newProjectPath" placeholder="选择或输入项目目录..." style="flex:1">
+        <button class="btn btn-secondary" onclick="browseFolder()" style="padding:8px 16px;white-space:nowrap">📁 浏览...</button>
+      </div>
+    </div>
+    </div>
+    <div style="color:var(--text2);font-size:12px;margin-bottom:12px">如果目录不存在将自动创建。将在该目录下创建 .miaobi 数据库和 .env 配置。</div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="createProject()">创建 / 打开</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('newProjectModal').style.display='none'">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const socket = io()
+const logBody = document.getElementById('logBody')
+const contentBody = document.getElementById('contentBody')
+let streamingActive = false
+
+// === Socket handlers ===
+socket.on('connect', () => { appendLog('info','✅ 已连接'); loadProjects(); loadSettings() })
+socket.on('disconnect', () => appendLog('error','❌ 断开'))
+
+// 流式内容
+socket.on('stream', chunk => {
+  if (!streamingActive) { contentBody.textContent = ''; streamingActive = true }
+  // 简单渲染：<think> 标签内容用灰色斜体
+  const t = contentBody.textContent
+  contentBody.textContent = t + chunk
+  contentBody.scrollTop = contentBody.scrollHeight
+  updateWordCount()
+})
+
+// 步骤开始 → 重置内容区
+socket.on('stream-reset', () => {
+  contentBody.textContent = ''
+  streamingActive = true
+  updateWordCount()
+})
+
+socket.on('log', data => {
+  if (data.type==='log') appendLog('info',data.message)
+  if (data.type==='step-start') {
+    appendLog('step',`━━━ ${data.name} [${data.index+1}/${data.total}] ━━━`)
+    document.getElementById('stepIndicator').textContent = `⏳ ${data.name}`
+    document.getElementById('stepIndicator').style.display = 'block'
+  }
+  if (data.type==='step-done') {
+    appendLog('done',`✅ ${data.name} 完成`)
+    document.getElementById('stepIndicator').style.display = 'none'
+    streamingActive = false
+    updateWordCount()
+  }
+  if (data.type==='done') {
+    appendLog('done',`🎉 ${data.message||'操作完成'}`)
+    document.getElementById('stepIndicator').style.display = 'none'
+    streamingActive = false
+    updateWordCount()
+  }
+  if (data.type==='error') {
+    appendLog('error',`❌ ${data.message}`)
+    showToast('操作失败: '+data.message,'error')
+    document.getElementById('stepIndicator').style.display = 'none'
+  }
+})
+
+function appendLog(c,m){ const d=document.createElement('div'); d.className='line '+c; d.textContent=m; logBody.appendChild(d); logBody.scrollTop=logBody.scrollHeight }
+function clearLogs(){ logBody.innerHTML='<div class="line info">已清空</div>' }
+
+function updateWordCount() {
+  const t = contentBody.textContent || ''
+  const wc = t.replace(/\s/g,'').length
+  document.getElementById('contentWordCount').textContent = wc ? `${wc} 字` : ''
+}
+
+// === Nav ===
+document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', ()=>{
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'))
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'))
+  item.classList.add('active')
+  document.getElementById('panel-'+item.dataset.panel).classList.add('active')
+  if (item.dataset.panel==='config') loadConfigDisplay()
+  if (item.dataset.panel==='architect') loadArchitectDisplay()
+  if (item.dataset.panel==='blueprint') loadBlueprints()
+  if (item.dataset.panel==='settings') loadSettings()
+}))
+
+// === Toast ===
+function showToast(m,t){ const e=document.createElement('div'); e.className='toast '+t; e.textContent=m; document.body.appendChild(e); setTimeout(()=>e.remove(),3000) }
+
+// === Projects ===
+async function loadProjects(){
+  try{
+    const r=await fetch('/api/projects'); const d=await r.json()
+    const sel=document.getElementById('projectSelect')
+    const projects=d.projects||[]
+    sel.innerHTML=projects.length>0
+      ? projects.map(p=>`<option value="${esc(p.path)}" ${p.path===d.currentPath?'selected':''}>${esc(p.name)} — ${esc(p.path)}</option>`).join('')
+      : '<option value="">（无项目）</option>'
+    // 如果没有项目，强制弹出新建对话框
+    if(!projects.length){
+      showNewProjectDialog()
+      // 防止用户关闭对话框（无项目时无法使用）
+      document.getElementById('newProjectModal').onclick=function(e){ if(e.target===this) this.style.display='flex' }
+    }
+    refreshStatus()
+  }catch(e){}
+}
+
+async function switchProject(path){
+  if(!path) return
+  if(!confirm('切换项目将刷新所有状态，确认切换到：'+path+'？')) { loadProjects(); return }
+  try{
+    const r=await fetch('/api/projects/switch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})})
+    if(!r.ok){ const e=await r.json(); showToast('切换失败: '+e.error,'error'); loadProjects(); return }
+    showToast('项目已切换','success')
+    loadProjects()
+  }catch(e){ showToast('网络错误','error') }
+}
+
+function showNewProjectDialog(){
+  document.getElementById('newProjectModal').style.display='flex'
+  document.getElementById('newProjectName').focus()
+}
+
+async function createProject(){
+  const name=document.getElementById('newProjectName').value.trim()
+  const path=document.getElementById('newProjectPath').value.trim()
+  if(!path) return showToast('请输入项目目录路径','error')
+  document.getElementById('newProjectModal').style.display='none'
+  // 恢复正常关闭行为
+  document.getElementById('newProjectModal').onclick=function(e){ if(e.target===this) this.style.display='none' }
+  try{
+    const r=await fetch('/api/projects/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path,name:name||undefined})})
+    if(!r.ok){ const e=await r.json(); showToast('创建失败: '+e.error,'error'); return }
+    showToast('项目已创建','success')
+    loadProjects()
+  }catch(e){ showToast('网络错误','error') }
+}
+
+let _browsing=false
+async function browseFolder(){
+  if(_browsing) return
+  _browsing=true
+  const btn=document.querySelector('#newProjectModal button[onclick="browseFolder()"]')
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 选择中...' }
+  try{
+    const r=await fetch('/api/dialog/select-folder',{method:'POST'})
+    const d=await r.json()
+    if(!r.ok){ showToast('打开对话框失败: '+d.error,'error'); return }
+    if(d.cancelled) return
+    document.getElementById('newProjectPath').value=d.path
+  }catch(e){ showToast('打开对话框失败','error') }
+  finally{ _browsing=false; if(btn){ btn.disabled=false; btn.textContent='📁 浏览...' } }
+}
+
+// === Status ===
+async function refreshStatus(){
+  try{
+    const r=await fetch('/api/status'); const s=await r.json()
+    document.getElementById('statusDot').className='dot '+(s.ok&&s.llmConfigured?'green':'red')
+    document.getElementById('statusText').textContent=s.llmConfigured?`已连接 (${s.model})`:'未配置 LLM'
+    let parts=[`目录: ${pathBasename(s.projectPath)}`]
+    if(s.configItems>0) parts.push(`⚙️项目配置(${s.configItems}项)`)
+    if(s.architectureSteps.length>0) parts.push(`🏗️架构已完成`)
+    if(s.totalPlanned>0) parts.push(`📋蓝图${s.totalPlanned}章`)
+    if(s.characterCount>0) parts.push(`👤角色${s.characterCount}人`)
+    if(s.draftCount>0) parts.push(`✍️草稿${s.draftCount}篇`)
+    if(s.totalChapters>0) parts.push(`📖已完成${s.totalChapters}章`)
+    if(parts.length===1) parts.push('（新项目）')
+    document.getElementById('projectInfo').textContent=parts.join(' | ')
+    // 同步加载配置/架构展示
+    if(s.configItems>0) loadConfigDisplay()
+    if(s.architectureSteps.length>0) loadArchitectDisplay()
+  }catch(e){ document.getElementById('statusText').textContent='服务器未连接' }
+}
+function pathBasename(p){ return (p||'').split(/[\\/]/).pop()||p }
+
+const CONFIG_LABELS = {
+  genre:'类型', sub_genre:'子类型', target_audience:'目标受众', plot_structure:'情节结构',
+  narrative_pov:'叙事视角', core_outline:'核心梗概', world_setting:'世界观',
+  golden_finger:'金手指', protagonist_profile:'主角设定', global_guidance:'全局指导',
+  writing_style:'写作风格', words_per_chapter:'每章字数', total_chapters:'总章数'
+}
+const CONFIG_KEYS_SHORT = ['genre','sub_genre','plot_structure','target_audience','narrative_pov','words_per_chapter','total_chapters']
+const CONFIG_KEYS_FULL = ['core_outline','world_setting','golden_finger','protagonist_profile','global_guidance','writing_style']
+
+async function loadConfigDisplay(){
+  try{
+    const r=await fetch('/api/novel-config'); const cfg=await r.json()
+    const keys=Object.keys(cfg)
+    if(keys.length===0){ document.getElementById('config-empty').style.display=''; document.getElementById('config-display').style.display='none'; return }
+    document.getElementById('config-empty').style.display='none'
+    document.getElementById('config-display').style.display=''
+    document.getElementById('config-exists-badge').style.display=''; document.getElementById('config-exists-badge').textContent=`(${keys.length}项)`
+    // 简短字段
+    let html=''
+    for(const k of CONFIG_KEYS_SHORT){
+      if(cfg[k]) html+=`<div><span style="color:var(--text2)">${CONFIG_LABELS[k]||k}</span>: ${escapeHtml(String(cfg[k]))}</div>`
+    }
+    document.getElementById('config-short').innerHTML=html
+    // 长文字段
+    html=''
+    for(const k of CONFIG_KEYS_FULL){
+      if(cfg[k]) html+=`<div style="margin-bottom:10px"><div style="color:var(--accent2);font-weight:600;margin-bottom:4px">${CONFIG_LABELS[k]||k}</div><div style="color:var(--text);white-space:pre-wrap;line-height:1.6">${escapeHtml(String(cfg[k]))}</div></div>`
+    }
+    document.getElementById('config-full').innerHTML=html||'<span style="color:var(--text2)">(无)</span>'
+  }catch(e){}
+}
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+// === 架构展示 ===
+const ARCH_LABELS = { premise:'故事前提', characters:'角色图谱', worldbuilding:'世界观矩阵', synopsis:'情节大纲' }
+async function loadArchitectDisplay(){
+  try{
+    const r=await fetch('/api/project-core'); const data=await r.json()
+    const keys=Object.keys(data).filter(k=>ARCH_LABELS[k])
+    if(keys.length===0) return
+    const card=document.getElementById('architect-display-card')
+    card.style.display=''; document.getElementById('architect-status').textContent=`(${keys.length}/4 步已完成)`
+    let h=''
+    for(const k of ['premise','characters','worldbuilding','synopsis']){
+      h+=`<details style="margin-top:8px" ${data[k]?'':'open disabled'}><summary style="cursor:pointer;color:${data[k]?'var(--accent2)':'var(--text2)'};font-size:13px">${data[k]?'✅':'⬜'} ${ARCH_LABELS[k]||k} (${data[k]?data[k].length+'字':'未生成'})</summary>`
+      if(data[k]) h+=`<div style="margin-top:8px;color:var(--text);white-space:pre-wrap;line-height:1.6;font-size:13px;padding-left:12px;border-left:3px solid var(--surface2)">${escapeHtml(data[k].substring(0,2000))}${data[k].length>2000?'...':''}</div>`
+      h+='</details>'
+    }
+    document.getElementById('architect-display').innerHTML=h
+  }catch(e){}
+}
+
+async function extractCharacters(){
+  clearLogs(); appendLog('step','开始从已有角色图谱中提取角色卡...')
+  await apiPost('/api/extract-characters',{},'角色提取已启动')
+}
+
+setInterval(refreshStatus,10000)
+
+// === Settings ===
+async function loadSettings(){
+  try{
+    const r=await fetch('/api/settings'); const c=await r.json()
+    document.getElementById('settings-baseUrl').value=c.baseUrl||''
+    document.getElementById('settings-apiKey').value=c.apiKey||''
+    document.getElementById('settings-model').value=c.model||''
+    document.getElementById('settings-wordsPerChapter').value=c.wordsPerChapter||3000
+    document.getElementById('settings-totalChapters').value=c.totalChapters||100
+    document.getElementById('settings-info').innerHTML=
+      `<div><span style="color:var(--text2)">API: </span>${esc(c.baseUrl||'未配置')}</div>
+       <div><span style="color:var(--text2)">模型: </span>${esc(c.model||'未配置')}</div>
+       <div><span style="color:var(--text2)">密钥: </span>${c.apiKey?'✅ 已配置 ('+c.apiKey.slice(0,8)+'...)':'❌ 未配置'}</div>
+       <div><span style="color:var(--text2)">项目: </span>${esc(c.projectPath||'')}</div>`
+  }catch(e){}
+}
+
+async function saveSettings(){
+  const body={
+    baseUrl: document.getElementById('settings-baseUrl').value.trim(),
+    apiKey: document.getElementById('settings-apiKey').value.trim(),
+    model: document.getElementById('settings-model').value.trim(),
+    wordsPerChapter: parseInt(document.getElementById('settings-wordsPerChapter').value)||3000,
+    totalChapters: parseInt(document.getElementById('settings-totalChapters').value)||100,
+  }
+  try{
+    const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    if(!r.ok){ const e=await r.json(); showToast('保存失败: '+e.error,'error'); return }
+    document.getElementById('settingsStatus').textContent='✅ 已保存'
+    showToast('设置已保存','success')
+    refreshStatus()
+    setTimeout(()=>document.getElementById('settingsStatus').textContent='',2000)
+  }catch(e){ showToast('网络错误','error') }
+}
+
+function toggleApiKey(){ const el=document.getElementById('settings-apiKey'); el.type=el.type==='password'?'text':'password' }
+
+// === API ===
+async function apiPost(url,body,toastMsg){
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    if(!r.ok){ const e=await r.json(); appendLog('error',`❌ ${e.error||'请求失败'}`); showToast(e.error||'请求失败','error'); return }
+    if(toastMsg) showToast(toastMsg,'success')
+  }catch(e){ appendLog('error',`❌ 网络错误: ${e.message}`) }
+}
+
+async function generateConfig(){
+  const idea=document.getElementById('config-idea').value.trim()
+  if(!idea) return showToast('请输入小说灵感','error')
+  clearLogs(); appendLog('step','开始生成配置...')
+  await apiPost('/api/config',{idea,chapters:parseInt(document.getElementById('config-chapters').value)||100,words:parseInt(document.getElementById('config-words').value)||3000},'配置生成已启动')
+}
+
+async function generateArchitecture(){
+  const steps=[]
+  if(document.getElementById('step-premise').checked) steps.push('premise')
+  if(document.getElementById('step-characters').checked) steps.push('characters')
+  if(document.getElementById('step-world').checked) steps.push('worldbuilding')
+  if(document.getElementById('step-synopsis').checked) steps.push('synopsis')
+  if(!steps.length) return showToast('请至少选择一个步骤','error')
+  clearLogs(); appendLog('step','开始生成故事架构...')
+  let stepGuidance=null
+  try{ const raw=document.getElementById('architect-guidance').value.trim(); if(raw) stepGuidance=JSON.parse(raw) }
+  catch(e){ showToast('微操指导 JSON 格式错误','error'); return }
+  await apiPost('/api/architect',{steps:steps.join(','),stepGuidance},'架构生成已启动')
+}
+
+async function generateBlueprint(){
+  const mode=document.getElementById('bp-mode').value
+  const start=document.getElementById('bp-start').value
+  const count=document.getElementById('bp-count').value
+  const pacing=document.getElementById('bp-pacing').value
+  clearLogs(); appendLog('step','开始生成蓝图...')
+  await apiPost('/api/blueprint',{mode,start:start?parseInt(start):undefined,count:count?parseInt(count):undefined,pacing:pacing||undefined},'蓝图生成已启动')
+}
+
+async function loadBlueprints(){
+  try{
+    const r=await fetch('/api/blueprints'); const bps=await r.json()
+    document.getElementById('bp-total').textContent=`(${bps.length} 章)`
+    const list=document.getElementById('bp-list')
+    if(!bps.length){ list.innerHTML='<span style="color:var(--text2)">暂无蓝图</span>'; return }
+    list.innerHTML=bps.map(b=>`<div class="bp-item" onclick="fillFromBlueprint(${b.chapterNumber})"><span class="num">第${b.chapterNumber}章</span><span class="title">${esc(b.title)}</span><span class="role">${esc(b.role)}</span></div>`).join('')
+    // 已有蓝图时自动切到追加模式，预填下一章
+    const maxCh=Math.max(...bps.map(b=>b.chapterNumber))
+    document.getElementById('bp-mode').value='append'
+    document.getElementById('bp-start').placeholder=`默认 ${maxCh+1}`
+  }catch(e){}
+}
+
+function fillFromBlueprint(ch){ document.getElementById('write-ch').value=ch; document.querySelector('[data-panel="write"]').click() }
+
+async function writeChapter(){
+  const ch=parseInt(document.getElementById('write-ch').value)
+  if(!ch) return showToast('请输入章节号','error')
+  clearLogs(); appendLog('step',`撰写第${ch}章...`)
+  await apiPost('/api/write',{
+    chapterNumber:ch,
+    title:document.getElementById('write-title').value||undefined,
+    role:document.getElementById('write-role').value||undefined,
+    purpose:document.getElementById('write-purpose').value||undefined,
+    keyEvents:document.getElementById('write-events').value||undefined,
+    characters:document.getElementById('write-chars').value?document.getElementById('write-chars').value.split(',').map(s=>s.trim()):undefined,
+    suspenseHook:document.getElementById('write-hook').value||undefined,
+    userGuidance:document.getElementById('write-guidance').value||undefined
+  },`第${ch}章写稿已启动`)
+}
+
+function oneClickFromWrite(){
+  const ch=parseInt(document.getElementById('write-ch').value)
+  if(!ch) return showToast('请先输入章节号','error')
+  document.getElementById('oc-ch').value=ch
+  document.getElementById('oc-title').value=document.getElementById('write-title').value
+  document.getElementById('oc-role').value=document.getElementById('write-role').value
+  document.getElementById('oc-events').value=document.getElementById('write-events').value
+  document.getElementById('oc-chars').value=document.getElementById('write-chars').value
+  document.getElementById('oc-guidance').value=document.getElementById('write-guidance').value
+  document.querySelector('[data-panel="oneclick"]').click()
+}
+
+async function oneClick(){
+  const ch=parseInt(document.getElementById('oc-ch').value)
+  if(!ch) return showToast('请输入章节号','error')
+  clearLogs(); appendLog('step',`一键完成 第${ch}章...`)
+  await apiPost('/api/one-click',{
+    chapterNumber:ch,
+    title:document.getElementById('oc-title').value||undefined,
+    role:document.getElementById('oc-role').value||undefined,
+    keyEvents:document.getElementById('oc-events').value||undefined,
+    characters:document.getElementById('oc-chars').value?document.getElementById('oc-chars').value.split(',').map(s=>s.trim()):undefined,
+    userGuidance:document.getElementById('oc-guidance').value||undefined,
+    focus:document.getElementById('oc-focus').value||undefined
+  },`第${ch}章 一键完成已启动`)
+}
+
+async function refineChapter(){
+  const ch=parseInt(document.getElementById('post-ch').value)
+  if(!ch) return showToast('请输入章节号','error')
+  clearLogs(); appendLog('step',`修稿 第${ch}章...`)
+  await apiPost('/api/refine',{chapterNumber:ch},`第${ch}章修稿已启动`)
+}
+
+async function reviewChapter(){
+  const ch=parseInt(document.getElementById('post-ch').value)
+  if(!ch) return showToast('请输入章节号','error')
+  clearLogs(); appendLog('step',`审稿 第${ch}章...`)
+  await apiPost('/api/review',{chapterNumber:ch},`第${ch}章审稿已启动`)
+}
+
+async function finalizeChapter(){
+  const ch=parseInt(document.getElementById('post-ch').value)
+  if(!ch) return showToast('请输入章节号','error')
+  clearLogs(); appendLog('step',`定稿 第${ch}章...`)
+  await apiPost('/api/finalize',{chapterNumber:ch,title:document.getElementById('post-title').value||undefined},`第${ch}章定稿已启动`)
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+refreshStatus()
+</script>
+</body>
+</html>

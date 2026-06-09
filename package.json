@@ -1,0 +1,31 @@
+{
+  "name": "miaobi-cli",
+  "version": "1.0.0",
+  "description": "妙笔 小说创作工作流 CLI — 一键完成从架构到定稿的全流程 AI 写作",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "miaobi": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').cpSync('src/public','dist/public',{recursive:true})\"",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "ui": "node dist/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "commander": "^13.1.0",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "openai": "^4.89.0",
+    "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
