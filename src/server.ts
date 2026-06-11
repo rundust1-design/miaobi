@@ -21,6 +21,8 @@ import {
   createRefineFromReviewWorkflow, createFinalizeWorkflow,
   createOneClickCompleteWorkflow, createRepairFinalizeWorkflow,
 } from './workflows.js'
+import { getVectorStats, searchRelevantContext, clearAllChunks, storeChapterChunks, deleteChapterChunks } from './vector-db.js'
+import { chunkChapterText, embedChunks } from './embedding.js'
 import { ExtractCharactersCommand } from './commands/architecture.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -166,6 +168,9 @@ app.get('/api/settings', (_req, res) => {
     baseUrl: cfg.llm.baseUrl,
     apiKey: cfg.llm.apiKey,
     model: cfg.llm.model,
+    embeddingBaseUrl: cfg.llm.embedding.baseUrl,
+    embeddingApiKey: cfg.llm.embedding.apiKey,
+    embeddingModel: cfg.llm.embedding.model,
     wordsPerChapter: cfg.writing.wordsPerChapter,
     totalChapters: cfg.writing.totalChapters,
     projectPath: cfg.projectPath,
@@ -173,11 +178,14 @@ app.get('/api/settings', (_req, res) => {
 })
 
 app.post('/api/settings', (req, res) => {
-  const { baseUrl, apiKey, model, wordsPerChapter, totalChapters } = req.body
+  const { baseUrl, apiKey, model, embeddingBaseUrl, embeddingApiKey, embeddingModel, wordsPerChapter, totalChapters } = req.body
   updateConfig({
     baseUrl: baseUrl?.trim?.(),
     apiKey: apiKey?.trim?.(),
     model: model?.trim?.(),
+    embeddingBaseUrl: embeddingBaseUrl?.trim?.(),
+    embeddingApiKey: embeddingApiKey?.trim?.(),
+    embeddingModel: embeddingModel?.trim?.(),
     wordsPerChapter: wordsPerChapter ? parseInt(String(wordsPerChapter)) : undefined,
     totalChapters: totalChapters ? parseInt(String(totalChapters)) : undefined,
   })
@@ -288,7 +296,12 @@ app.post('/api/dialog/select-folder', (_req, res) => {
       '',
     ]
     writeFileSync(scriptPath, '﻿' + scriptLines.join('\r\n'), 'utf-8')
-    const result = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`, { encoding: 'utf8', timeout: 120000 })
+    // PowerShell 在中文 Windows 上默认输出 CP936 (GBK)，用 -Command 强制 UTF-8 输出
+    const psCmd = `[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; & '${scriptPath.replace(/'/g, "''")}'`
+    const result = execSync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCmd}"`,
+      { encoding: 'utf8', timeout: 120000 },
+    )
     // 清理临时文件
     try { require('fs').unlinkSync(scriptPath) } catch {}
     const selectedPath = result.trim()
@@ -618,6 +631,106 @@ app.get('/api/characters', (_req, res) => {
 
 // ===== 导出已定稿章节为 .txt =====
 import { safeFilename } from './utils.js'
+
+// ===== 向量库统计 =====
+app.get('/api/vector-stats', (_req, res) => {
+  try {
+    const stats = getVectorStats()
+    res.json({ ok: true, ...stats })
+  } catch (e) {
+    res.json({ ok: false, error: String(e) })
+  }
+})
+
+// ===== 全量重索引 =====
+app.post('/api/reindex', async (req, res) => {
+  try {
+    const cfg = getConfig()
+    if (!cfg.projectPath) return res.status(400).json({ error: '未选择项目' })
+
+    const { chapterNumbers } = req.body || {}
+
+    // 支持指定章节或全部已定稿章节
+    res.json({ started: true })
+
+    withAbortContext(
+      async signal => {
+        let chapters: Array<{ chapterNumber: number; content: string }> = []
+
+        if (chapterNumbers && Array.isArray(chapterNumbers) && chapterNumbers.length > 0) {
+          // 指定章节
+          for (const cn of chapterNumbers) {
+            const draft = getFinalizedDraft(cn)
+            if (draft?.content) {
+              chapters.push({ chapterNumber: cn, content: draft.content })
+            } else {
+              io.emit('log', { type: 'log', message: `⚠️ 第${cn}章无定稿，跳过` })
+            }
+          }
+        } else {
+          // 全部已定稿章节
+          const finalized = getAllFinalizedSummary()
+          if (finalized.length === 0) {
+            io.emit('log', { type: 'done', message: '没有已定稿的章节' })
+            return
+          }
+          chapters = finalized
+            .map(f => {
+              const draft = getFinalizedDraft(f.chapterNumber)
+              return { chapterNumber: f.chapterNumber, content: draft?.content || '' }
+            })
+            .filter(c => c.content)
+        }
+
+        if (chapters.length === 0) {
+          io.emit('log', { type: 'done', message: '无有效章节可索引' })
+          return
+        }
+
+        // 清空旧索引
+        io.emit('log', { type: 'log', message: '🧹 正在清空旧索引...' })
+        clearAllChunks()
+
+        let totalStored = 0
+        for (const c of chapters) {
+          if (signal.aborted) {
+            io.emit('log', { type: 'log', message: '🛑 重索引已取消' })
+            return
+          }
+
+          io.emit('log', { type: 'log', message: `📐 正在处理第${c.chapterNumber}章...` })
+
+          deleteChapterChunks(c.chapterNumber)
+          const chunks = chunkChapterText(c.content, c.chapterNumber)
+          if (chunks.length === 0) continue
+
+          const vectorMap = await embedChunks(chunks)
+          const records = chunks
+            .filter(ch => vectorMap.has(ch.contentHash))
+            .map(ch => ({
+              chapterNumber: ch.chapterNumber,
+              chunkIndex: ch.chunkIndex,
+              content: ch.content,
+              contentHash: ch.contentHash,
+              embedding: vectorMap.get(ch.contentHash)!,
+              tokenCount: ch.tokenCount,
+            }))
+
+          const stored = storeChapterChunks(records)
+          totalStored += stored
+          io.emit('log', { type: 'log', message: `  ✅ 第${c.chapterNumber}章：${stored}/${chunks.length} 个片段` })
+        }
+
+        const stats = getVectorStats()
+        io.emit('log', { type: 'done', message: `🎉 重索引完成！共 ${totalStored} 条向量，覆盖 ${stats.chapterRange}` })
+      },
+      '重索引完成',
+    )
+  } catch (e) {
+    io.emit('log', { type: 'error', message: String(e) })
+  }
+})
+
 app.post('/api/export-finalized', async (req, res) => {
   try {
     const cfg = getConfig()

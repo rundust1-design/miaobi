@@ -8,6 +8,7 @@ import {
   getCharacterStatesSummary, getChapterNotesTimeline,
   getProjectCore, saveReview, getLatestDraft,
 } from '../database.js'
+import { searchRelevantContext } from '../vector-db.js'
 
 export class ReviewChapterCommand extends BaseCommand<string> {
   constructor(
@@ -29,8 +30,27 @@ export class ReviewChapterCommand extends BaseCommand<string> {
     })()
 
     const characterStates = getCharacterStatesSummary()
-    const globalSummary = getChapterNotesTimeline(this.chapterNumber + 1)
+    const chapterTimeline = getChapterNotesTimeline(this.chapterNumber + 1)
     const worldBuilding = getProjectCore('worldbuilding') || '（世界观未构建）'
+
+    // 语义检索跨章节相关上下文
+    let semanticContext = ''
+    try {
+      callbacks.log('  🔍 语义检索跨章节关联内容...')
+      // 取本章前 800 字作为查询
+      const querySample = draftContent.slice(0, 800)
+      semanticContext = await searchRelevantContext(querySample, 10, this.chapterNumber)
+      if (!semanticContext.includes('未找到相关上下文')) {
+        callbacks.log(`  ✅ 检索到跨章节关联内容`)
+      }
+    } catch (e) {
+      callbacks.log(`  ⚠️ 语义检索跳过: ${e}`)
+    }
+
+    // 合并语义检索结果与固定窗口
+    const globalSummary = semanticContext && !semanticContext.includes('未找到相关上下文')
+      ? `${semanticContext}\n\n【固定窗口要点】\n${chapterTimeline}`
+      : chapterTimeline
 
     const builder = new ReviewPromptBuilder(template)
       .withChapterContent(draftContent)

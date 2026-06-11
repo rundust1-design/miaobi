@@ -13,6 +13,8 @@ import {
 } from '../database.js'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { getConfig } from '../config.js'
+import { chunkChapterText, embedChunks } from '../embedding.js'
+import { storeChapterChunks, deleteChapterChunks, getVectorStats } from '../vector-db.js'
 
 export interface FinalizeParams {
   draftPath: string
@@ -77,6 +79,9 @@ export class FinalizeChapterCommand extends BaseCommand<void> {
     if (chNum % 5 === 0) {
       await this.analyzeStyle(callbacks)
     }
+
+    // 步骤 4: 向量化入库（每章都执行）
+    await this.indexChapterContent(callbacks)
   }
 
   private async generateChapterNotes(callbacks: StepCallbacks): Promise<void> {
@@ -189,5 +194,52 @@ export class FinalizeChapterCommand extends BaseCommand<void> {
     callbacks.log('  🎨 正在分析文风...')
     const result = await callLLM(builder.getSystemRole(), builder.build())
     callbacks.log('  ✅ 文风分析完成')
+  }
+
+  /** 步骤 4: 向量化入库 */
+  private async indexChapterContent(callbacks: StepCallbacks): Promise<void> {
+    try {
+      const content = this.params.draftContent
+      if (!content || content.trim().length === 0) {
+        callbacks.log('  ⏭️ 跳过向量化：内容为空')
+        return
+      }
+
+      // 先删除本章旧 chunks（支持重定稿幂等）
+      deleteChapterChunks(this.params.chapterNumber)
+
+      // 切片
+      callbacks.log('  🧩 正在对章节文本切片...')
+      const chunks = chunkChapterText(content, this.params.chapterNumber)
+
+      if (chunks.length === 0) {
+        callbacks.log('  ⏭️ 跳过向量化：无有效切片')
+        return
+      }
+
+      callbacks.log(`  📐 切片完成：${chunks.length} 个片段`)
+
+      // 批量向量化
+      callbacks.log('  🧠 正在生成向量嵌入...')
+      const vectorMap = await embedChunks(chunks)
+
+      // 写入数据库
+      const records = chunks
+        .filter(c => vectorMap.has(c.contentHash))
+        .map(c => ({
+          chapterNumber: c.chapterNumber,
+          chunkIndex: c.chunkIndex,
+          content: c.content,
+          contentHash: c.contentHash,
+          embedding: vectorMap.get(c.contentHash)!,
+          tokenCount: c.tokenCount,
+        }))
+
+      const stored = storeChapterChunks(records)
+      const stats = getVectorStats()
+      callbacks.log(`  ✅ 向量化入库完成：${stored}/${chunks.length} 个新片段（累计 ${stats.totalChunks} 条）`)
+    } catch (e) {
+      callbacks.log(`  ⚠️ 向量化入库失败（跳过，不影响定稿）: ${e}`)
+    }
   }
 }

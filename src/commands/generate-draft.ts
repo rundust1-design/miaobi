@@ -10,6 +10,7 @@ import {
   getCharacterStatesSummary, getChapterNotesTimeline, getPreviousChapterEnding,
   getFinalizedDraft, createDraft, getNextDraftVersion,
 } from '../database.js'
+import { searchRelevantContext } from '../vector-db.js'
 
 export interface ChapterInfo {
   chapterNumber: number
@@ -71,13 +72,44 @@ export class GenerateDraftCommand extends BaseCommand<string> {
 
       const previousEnding = getPreviousChapterEnding(this.chapterInfo.chapterNumber)
 
+      // 语义检索：基于本章概要搜索全书相关内容
+      const searchQuery = [
+        this.chapterInfo.title,
+        this.chapterInfo.purpose,
+        this.chapterInfo.keyEvents,
+        (this.chapterInfo.characters || []).join(' '),
+      ].filter(Boolean).join(' ')
+
+      let relevantContext = ''
+      try {
+        callbacks.log('  🔍 语义检索相关上下文...')
+        relevantContext = await searchRelevantContext(
+          searchQuery,
+          15,
+          this.chapterInfo.chapterNumber,
+          2500,
+        )
+        if (!relevantContext.includes('未找到相关上下文')) {
+          callbacks.log(`  ✅ 语义检索到 ${relevantContext.length} 字相关上下文`)
+        } else {
+          callbacks.log('  ⚠️ 向量库暂无数据，使用固定窗口上下文')
+        }
+      } catch (e) {
+        callbacks.log(`  ⚠️ 语义检索失败，回退到固定窗口：${e}`)
+      }
+
+      // 优先使用语义检索结果，回退到固定窗口
+      const globalSummary = relevantContext && !relevantContext.includes('未找到相关上下文')
+        ? `${relevantContext}\n\n【固定窗口上下文（备选）】\n${chapterTimeline}`
+        : chapterTimeline
+
       builder
-        .withGlobalSummary(chapterTimeline)
+        .withGlobalSummary(globalSummary)
         .withCharacterStates(characterState)
         .withPreviousEnding(previousEnding)
         .withChapterInfo(this.chapterInfo)
         .withFutureBlueprints(futureBlueprintsStr)
-        .withFilteredContext('（知识库未配置）')
+        .withFilteredContext(relevantContext && !relevantContext.includes('未找到相关上下文') ? relevantContext : '（知识库未配置）')
         .withShortSummary('')
         .withUserGuidance(this.chapterInfo.userGuidance?.trim() || '（无微操指导）')
     }

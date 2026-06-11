@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { getConfig } from './config.js'
+import { initVectorSchema } from './vector-db.js'
 
 let db: Database.Database | null = null
 
@@ -100,6 +101,9 @@ function initSchema(): void {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `)
+
+  // 初始化向量存储表
+  initVectorSchema()
 }
 
 // ===== 项目核心（架构）=====

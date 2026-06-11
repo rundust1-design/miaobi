@@ -20,6 +20,58 @@ export function getLLMClient(): OpenAI {
   return client
 }
 
+// ===== Embedding 客户端（独立于写作 LLM） =====
+
+let embeddingClient: OpenAI | null = null
+let cachedEmbeddingBaseUrl = ''
+let cachedEmbeddingApiKey = ''
+
+export function getEmbeddingClient(): OpenAI {
+  const cfg = getConfig()
+  const baseUrl = cfg.llm.embedding.baseUrl || cfg.llm.baseUrl
+  const apiKey = cfg.llm.embedding.apiKey || cfg.llm.apiKey
+
+  if (embeddingClient && baseUrl === cachedEmbeddingBaseUrl && apiKey === cachedEmbeddingApiKey) {
+    return embeddingClient
+  }
+  embeddingClient = new OpenAI({
+    baseURL: baseUrl,
+    apiKey: apiKey,
+  })
+  cachedEmbeddingBaseUrl = baseUrl
+  cachedEmbeddingApiKey = apiKey
+  return embeddingClient
+}
+
+/**
+ * 批量向量化文本，返回浮点数数组的数组
+ * 自动处理 >2048 维度（OpenRouter Nemotron 输出 2048 维向量）
+ */
+export async function embedTexts(texts: string[]): Promise<number[][]> {
+  if (texts.length === 0) return []
+
+  const openai = getEmbeddingClient()
+  const cfg = getConfig()
+  const model = cfg.llm.embedding.model || 'nvidia/llama-nemotron-embed-vl-1b-v2:free'
+
+  const response = await openai.embeddings.create({
+    model,
+    input: texts,
+  })
+
+  return response.data
+    .sort((a, b) => a.index - b.index)
+    .map(d => d.embedding)
+}
+
+/**
+ * 单个文本向量化
+ */
+export async function embedSingle(text: string): Promise<number[]> {
+  const results = await embedTexts([text])
+  return results[0] || []
+}
+
 export interface LLMCallOptions {
   thinking?: boolean
   responseFormat?: { type: 'json_object' | 'text' }

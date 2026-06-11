@@ -68,6 +68,11 @@ export interface MiaobiConfig {
     baseUrl: string
     apiKey: string
     model: string
+    embedding: {
+      baseUrl: string
+      apiKey: string
+      model: string
+    }
   }
   writing: {
     wordsPerChapter: number
@@ -92,6 +97,11 @@ function loadConfig(projectPath: string): MiaobiConfig {
       baseUrl: process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
       apiKey: process.env.LLM_API_KEY || '',
       model: process.env.LLM_MODEL || 'gpt-4o',
+      embedding: {
+        baseUrl: process.env.EMBEDDING_BASE_URL || process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
+        apiKey: process.env.EMBEDDING_API_KEY || process.env.LLM_API_KEY || '',
+        model: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
+      },
     },
     writing: {
       wordsPerChapter: parseInt(process.env.DEFAULT_WORDS_PER_CHAPTER || '3000'),
@@ -116,7 +126,7 @@ export function getConfig(): MiaobiConfig {
   // 未选择项目时返回空占位配置
   if (_noProject) {
     return {
-      llm: { baseUrl: '', apiKey: '', model: '' },
+      llm: { baseUrl: '', apiKey: '', model: '', embedding: { baseUrl: '', apiKey: '', model: '' } },
       writing: { wordsPerChapter: 3000, totalChapters: 100 },
       miaobiHome: '',
       projectPath: '',
@@ -145,11 +155,16 @@ export function resetConfig(): void {
   _config = null
 }
 
-export function updateConfig(partial: Partial<MiaobiConfig['llm'] & MiaobiConfig['writing']>): void {
+export function updateConfig(partial: Partial<MiaobiConfig['llm'] & MiaobiConfig['writing'] & {
+  embeddingBaseUrl?: string; embeddingApiKey?: string; embeddingModel?: string
+}>): void {
   const cfg = getConfig()
   if (partial.baseUrl !== undefined) cfg.llm.baseUrl = partial.baseUrl
   if (partial.apiKey !== undefined) cfg.llm.apiKey = partial.apiKey
   if (partial.model !== undefined) cfg.llm.model = partial.model
+  if ((partial as any).embeddingBaseUrl !== undefined) cfg.llm.embedding.baseUrl = (partial as any).embeddingBaseUrl
+  if ((partial as any).embeddingApiKey !== undefined) cfg.llm.embedding.apiKey = (partial as any).embeddingApiKey
+  if ((partial as any).embeddingModel !== undefined) cfg.llm.embedding.model = (partial as any).embeddingModel
   if (partial.wordsPerChapter !== undefined) cfg.writing.wordsPerChapter = partial.wordsPerChapter
   if (partial.totalChapters !== undefined) cfg.writing.totalChapters = partial.totalChapters
 
@@ -172,6 +187,9 @@ function writeEnvFile(cfg: MiaobiConfig): void {
     LLM_BASE_URL: cfg.llm.baseUrl || '',
     LLM_API_KEY: cfg.llm.apiKey || '',
     LLM_MODEL: cfg.llm.model || '',
+    EMBEDDING_BASE_URL: cfg.llm.embedding.baseUrl || '',
+    EMBEDDING_API_KEY: cfg.llm.embedding.apiKey || '',
+    EMBEDDING_MODEL: cfg.llm.embedding.model || '',
     DEFAULT_WORDS_PER_CHAPTER: String(cfg.writing.wordsPerChapter),
     DEFAULT_TOTAL_CHAPTERS: String(cfg.writing.totalChapters),
   }

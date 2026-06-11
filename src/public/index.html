@@ -735,9 +735,25 @@ function showSettingsView() {
       <span id="settingsStatus" style="font-size:12px;color:var(--text2)"></span>
     </div>
   </div>
+  <div class="card" style="border-color: rgba(167,139,250,0.4);">
+    <h3>🧠 向量嵌入设置 (Embedding)</h3>
+    <p style="color:var(--text2);font-size:12px;margin-bottom:12px">用于语义检索，让 AI 在写作时能从全书检索相关上下文。免费模型推荐 OpenRouter 上的 Nvidia Nemotron。</p>
+    <div class="form-grid">
+      <div class="form-group full"><label>Embedding API 地址</label><input id="settings-embedBaseUrl" placeholder="https://openrouter.ai/api/v1"></div>
+      <div class="form-group full"><label>Embedding API 密钥</label><input id="settings-embedApiKey" type="password" placeholder="sk-or-v1-..."></div>
+      <div class="form-group full"><label>Embedding 模型名称</label><input id="settings-embedModel" placeholder="nvidia/llama-nemotron-embed-vl-1b-v2:free"></div>
+    </div>
+  </div>
   <div class="card">
     <h3>连接状态</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px" id="settings-info"></div>
+  </div>
+  <div class="card">
+    <h3>📊 向量库状态</h3>
+    <div style="font-size:13px" id="vector-stats">加载中...</div>
+    <div class="btn-group" style="margin-top:10px">
+      <button class="btn btn-secondary" onclick="reindexAll()">🔄 重建索引</button>
+    </div>
   </div>`)
   setTimeout(loadSettingsValues, 100)
 }
@@ -748,16 +764,46 @@ async function loadSettingsValues() {
     set('settings-baseUrl', c.baseUrl || '')
     set('settings-apiKey', c.apiKey || '')
     set('settings-model', c.model || '')
+    set('settings-embedBaseUrl', c.embeddingBaseUrl || '')
+    set('settings-embedApiKey', c.embeddingApiKey || '')
+    set('settings-embedModel', c.embeddingModel || '')
     const wpc = document.getElementById('settings-wordsPerChapter'); if (wpc) wpc.value = c.wordsPerChapter || 3000
     const tc = document.getElementById('settings-totalChapters'); if (tc) tc.value = c.totalChapters || 100
     const info = document.getElementById('settings-info')
     if (info) info.innerHTML = `<div><span style="color:var(--text2)">API: </span>${esc(c.baseUrl||'未配置')}</div>
       <div><span style="color:var(--text2)">模型: </span>${esc(c.model||'未配置')}</div>
       <div><span style="color:var(--text2)">密钥: </span>${c.apiKey?'✅ 已配置 ('+c.apiKey.slice(0,8)+'...)':'❌ 未配置'}</div>
+      <div><span style="color:var(--text2)">Embedding: </span>${esc(c.embeddingModel||'未配置')}</div>
       <div><span style="color:var(--text2)">项目: </span>${esc(c.projectPath||'')}</div>`
+    // 加载向量库状态
+    loadVectorStats()
   } catch (e) {}
 }
 function toggleApiKey() { const el = document.getElementById('settings-apiKey'); if (el) el.type = el.type === 'password' ? 'text' : 'password' }
+
+async function loadVectorStats() {
+  try {
+    const r = await fetch('/api/vector-stats'); const s = await r.json()
+    const el = document.getElementById('vector-stats')
+    if (el) el.innerHTML = `<div><span style="color:var(--text2)">已索引片段: </span><strong>${s.totalChunks || 0}</strong></div>
+      <div><span style="color:var(--text2)">覆盖章节: </span>${s.totalChapters ? s.totalChapters + ' 章 (第' + s.chapterRange + '章)' : '无'}</div>
+      <div><span style="color:var(--text2)">总 Token 数: </span>${s.totalTokens || 0}</div>`
+  } catch (e) { const el = document.getElementById('vector-stats'); if (el) el.textContent = '加载失败' }
+}
+
+async function reindexAll() {
+  if (!confirm('确定要重建全部向量索引吗？这将删除现有索引并重新生成。')) return
+  showToast('正在重建索引...', 'info')
+  document.getElementById('stopBtn').style.display = 'inline-block'
+  try {
+    const r = await fetch('/api/reindex', { method: 'POST' })
+    if (!r.ok) { const e = await r.json(); showToast('重建失败: ' + e.error, 'error'); return }
+    const result = await r.json()
+    showToast(result.message || '索引重建完成', 'success')
+    loadVectorStats()
+  } catch (e) { showToast('网络错误', 'error') }
+  finally { document.getElementById('stopBtn').style.display = 'none' }
+}
 
 // ======== Abort ========
 async function stopGeneration() {
@@ -1050,6 +1096,9 @@ async function saveSettings() {
     baseUrl: document.getElementById('settings-baseUrl').value.trim(),
     apiKey: document.getElementById('settings-apiKey').value.trim(),
     model: document.getElementById('settings-model').value.trim(),
+    embeddingBaseUrl: document.getElementById('settings-embedBaseUrl').value.trim(),
+    embeddingApiKey: document.getElementById('settings-embedApiKey').value.trim(),
+    embeddingModel: document.getElementById('settings-embedModel').value.trim(),
     wordsPerChapter: parseInt(document.getElementById('settings-wordsPerChapter').value) || 3000,
     totalChapters: parseInt(document.getElementById('settings-totalChapters').value) || 100,
   }
