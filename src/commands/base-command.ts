@@ -15,12 +15,13 @@ export interface StepContext {
 export interface StepCallbacks {
   log: (msg: string) => void
   onChunk?: (chunk: string) => void
+  signal?: AbortSignal
 }
 
 export abstract class BaseCommand<TResult = string> {
   abstract execute(context: StepContext, callbacks: StepCallbacks): Promise<TResult>
 
-  /** 调用 LLM（流式输出到控制台） */
+  /** 调用 LLM（流式输出到控制台），自动从 callbacks 读取 abort signal */
   protected async callLLM(
     systemPrompt: string,
     userPrompt: string,
@@ -31,6 +32,7 @@ export abstract class BaseCommand<TResult = string> {
     const result = await callLLM(systemPrompt, userPrompt, {
       responseFormat: options?.responseFormat,
       onChunk: callbacks.onChunk,
+      signal: callbacks.signal,
     })
     return result
   }

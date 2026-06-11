@@ -2,14 +2,21 @@ import OpenAI from 'openai'
 import { getConfig } from './config.js'
 
 let client: OpenAI | null = null
+let cachedBaseUrl = ''
+let cachedApiKey = ''
 
 export function getLLMClient(): OpenAI {
-  if (client) return client
   const cfg = getConfig()
+  // 当配置变更后重建客户端（baseUrl/apiKey 变化时）
+  if (client && cfg.llm.baseUrl === cachedBaseUrl && cfg.llm.apiKey === cachedApiKey) {
+    return client
+  }
   client = new OpenAI({
     baseURL: cfg.llm.baseUrl,
     apiKey: cfg.llm.apiKey,
   })
+  cachedBaseUrl = cfg.llm.baseUrl
+  cachedApiKey = cfg.llm.apiKey
   return client
 }
 

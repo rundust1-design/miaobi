@@ -2,10 +2,14 @@
  * 通用工具函数
  */
 
-/** 去除 DeepSeek 等模型的 <think> 标签 */
+/** 去除 DeepSeek 等模型的 thinking 标签（XML 格式 + 非标准前缀格式） */
 export function stripThinkingTags(text: string): string {
   if (!text) return text
-  return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim()
+  // 1. <thinking>...</thinking> XML 标签（DeepSeek V3/V4 标准格式）
+  text = text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+  // 2.  thinking...（R1 旧格式：空格前缀 + thinking，以  或 response 结尾）
+  text = text.replace(/ thinking[\s\S]*?(?:\s\sresponse|$)/gi, '')
+  return text.trim()
 }
 
 /** 容错 JSON 解析：剥离 Markdown 代码块 + 自动截取有效 JSON 边界 */

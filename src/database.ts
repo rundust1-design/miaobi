@@ -273,6 +273,21 @@ export function getLatestDraft(chapterNumber: number): DraftRecord | null {
   }
 }
 
+export function getDraftByChapterAndVersion(chapterNumber: number, version: number): DraftRecord | null {
+  const d = getDb()
+  const row = d.prepare(`SELECT * FROM drafts WHERE chapter_number = ? AND version = ?`).get(chapterNumber, version) as Record<string, unknown> | undefined
+  if (!row) return null
+  return {
+    id: row.id as number,
+    chapterNumber: row.chapter_number as number,
+    version: row.version as number,
+    source: row.source as string,
+    content: row.content as string,
+    wordCount: row.word_count as number,
+    status: row.status as string,
+  }
+}
+
 export function getFinalizedDraft(chapterNumber: number): DraftRecord | null {
   const d = getDb()
   const row = d.prepare(`SELECT * FROM drafts WHERE chapter_number = ? AND status = 'finalized' ORDER BY version DESC LIMIT 1`).get(chapterNumber) as Record<string, unknown> | undefined
@@ -296,6 +311,52 @@ export function updateDraftContent(id: number, content: string): void {
 export function updateDraftStatus(id: number, status: string): void {
   const d = getDb()
   d.prepare(`UPDATE drafts SET status = ?, updated_at = datetime('now') WHERE id = ?`).run(status, id)
+}
+
+export interface DraftSummary {
+  chapterNumber: number
+  version: number
+  status: string
+  wordCount: number
+  updatedAt: string
+}
+
+export function getAllDraftsSummary(): DraftSummary[] {
+  const d = getDb()
+  const rows = d.prepare(`
+    SELECT chapter_number, version, status, word_count, updated_at
+    FROM drafts
+    WHERE status != 'finalized'
+    ORDER BY chapter_number ASC
+  `).all() as Array<Record<string, unknown>>
+  return rows.map(r => ({
+    chapterNumber: r.chapter_number as number,
+    version: r.version as number,
+    status: r.status as string,
+    wordCount: r.word_count as number,
+    updatedAt: r.updated_at as string,
+  }))
+}
+
+export interface FinalizedSummary {
+  chapterNumber: number
+  wordCount: number
+  finalizedAt: string
+}
+
+export function getAllFinalizedSummary(): FinalizedSummary[] {
+  const d = getDb()
+  const rows = d.prepare(`
+    SELECT chapter_number, word_count, updated_at
+    FROM drafts
+    WHERE status = 'finalized'
+    ORDER BY chapter_number ASC
+  `).all() as Array<Record<string, unknown>>
+  return rows.map(r => ({
+    chapterNumber: r.chapter_number as number,
+    wordCount: r.word_count as number,
+    finalizedAt: r.updated_at as string,
+  }))
 }
 
 // ===== 角色 =====

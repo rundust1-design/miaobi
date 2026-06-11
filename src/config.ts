@@ -134,6 +134,7 @@ export function switchProject(projectPath: string): MiaobiConfig {
   // 通知外部先关闭 DB（避免跨项目连接错乱）
   // caller 负责先调 closeDb()
   const normalized = normPath(projectPath)
+  _noProject = false
   _config = loadConfig(normalized)
   registerProject(normalized)
   return _config
@@ -151,6 +152,62 @@ export function updateConfig(partial: Partial<MiaobiConfig['llm'] & MiaobiConfig
   if (partial.model !== undefined) cfg.llm.model = partial.model
   if (partial.wordsPerChapter !== undefined) cfg.writing.wordsPerChapter = partial.wordsPerChapter
   if (partial.totalChapters !== undefined) cfg.writing.totalChapters = partial.totalChapters
+
+  // 写回 .env 文件，确保重启后配置不丢失
+  if (cfg.projectPath) {
+    writeEnvFile(cfg)
+  }
+}
+
+function writeEnvFile(cfg: MiaobiConfig): void {
+  const envPath = resolve(cfg.projectPath, '.env')
+  // 读取现有 .env 文件，保留注释和非 LLM/WRITING 相关行
+  let existing = ''
+  if (existsSync(envPath)) {
+    existing = readFileSync(envPath, 'utf-8')
+  }
+
+  const envLines = existing.split(/\r?\n/)
+  const replacementMap: Record<string, string> = {
+    LLM_BASE_URL: cfg.llm.baseUrl || '',
+    LLM_API_KEY: cfg.llm.apiKey || '',
+    LLM_MODEL: cfg.llm.model || '',
+    DEFAULT_WORDS_PER_CHAPTER: String(cfg.writing.wordsPerChapter),
+    DEFAULT_TOTAL_CHAPTERS: String(cfg.writing.totalChapters),
+  }
+
+  const updatedKeys = new Set<string>()
+  const result: string[] = []
+
+  for (const line of envLines) {
+    const trimmed = line.trim()
+    // 保留空行和注释
+    if (!trimmed || trimmed.startsWith('#')) {
+      result.push(line)
+      continue
+    }
+    const eqIdx = trimmed.indexOf('=')
+    if (eqIdx === -1) {
+      result.push(line)
+      continue
+    }
+    const key = trimmed.slice(0, eqIdx).trim()
+    if (key in replacementMap) {
+      result.push(`${key}=${replacementMap[key]}`)
+      updatedKeys.add(key)
+    } else {
+      result.push(line)
+    }
+  }
+
+  // 追加新键
+  for (const [key, value] of Object.entries(replacementMap)) {
+    if (!updatedKeys.has(key)) {
+      result.push(`${key}=${value}`)
+    }
+  }
+
+  writeFileSync(envPath, result.join('\n') + '\n', 'utf-8')
 }
 
 export function validateConfig(): string[] {

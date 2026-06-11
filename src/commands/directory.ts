@@ -226,11 +226,14 @@ function extractBlueprintsByRegex(rawText: string, startNum: number, endNum: num
   const results: Blueprint[] = []
   const chapterBlocks: string[] = []
 
+  // 先用 stripThinkingTags 清理 thinking 内容，避免思考中的 JSON 干扰正则
+  const text = stripThinkingTags(rawText)
+
   // 定位 blueprints 数组
-  const bpArrayStartMatch = rawText.match(/"blueprints"\s*:\s*\[/i)
+  const bpArrayStartMatch = text.match(/"blueprints"\s*:\s*\[/i)
   if (bpArrayStartMatch) {
     const startPos = bpArrayStartMatch.index! + bpArrayStartMatch[0].length
-    const arrayContent = rawText.slice(startPos)
+    const arrayContent = text.slice(startPos)
 
     let braceDepth = 0, currentBlock = '', inString = false, escape = false
     for (let i = 0; i < arrayContent.length; i++) {

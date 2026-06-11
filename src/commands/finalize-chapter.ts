@@ -7,7 +7,7 @@ import { PostProcessPromptBuilder } from '../builder.js'
 import { callLLM } from '../llm.js'
 import { parseJSON, safeFilename } from '../utils.js'
 import {
-  getLatestDraft, updateDraftContent, updateDraftStatus,
+  getLatestDraft, updateDraftStatus,
   getProjectCore, getAllCharacters, saveCharacter, updateCharacterState,
   getConfigValue, getBlueprint, type Character, type CharacterState,
 } from '../database.js'
@@ -35,7 +35,11 @@ export class FinalizeChapterCommand extends BaseCommand<void> {
     const draft = getLatestDraft(this.params.chapterNumber)
     if (!draft) throw new Error(`第 ${this.params.chapterNumber} 章无草稿`)
 
-    updateDraftContent(draft.id, this.params.draftContent)
+    // 从数据库取实际内容（draftContent 参数可能为空）
+    const content = draft.content || ''
+    // 同步回 params，后续 postProcess 依赖此字段
+    this.params.draftContent = content
+
     updateDraftStatus(draft.id, 'finalized')
 
     // 2. 写入物理文件
@@ -46,7 +50,7 @@ export class FinalizeChapterCommand extends BaseCommand<void> {
     const titleLine = this.params.chapterTitle
       ? `第${this.params.chapterNumber}章 ${this.params.chapterTitle}\n\n`
       : `第${this.params.chapterNumber}章\n\n`
-    writeFileSync(physicalPath, titleLine + this.params.draftContent.replace(/^#+ .*\n*/, ''), 'utf-8')
+    writeFileSync(physicalPath, titleLine + content.replace(/^#+ .*\n*/, ''), 'utf-8')
     callbacks.log(`✅ 定稿已写入: ${physicalPath}`)
 
     // 3. 后处理步骤

@@ -17,12 +17,31 @@ body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: va
 .sidebar-header { padding: 20px 16px; border-bottom: 1px solid var(--border); }
 .sidebar-header h1 { font-size: 20px; color: var(--accent2); letter-spacing: 2px; }
 .sidebar-header p { font-size: 11px; color: var(--text2); margin-top: 4px; }
-.sidebar-nav { flex:1; padding: 8px 0; display: flex; flex-direction: column; }
-.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; color: var(--text2); font-size: 14px; border-left: 3px solid transparent; }
-.nav-item:hover { background: var(--surface2); color: var(--text); }
-.nav-item.active { background: var(--surface2); color: var(--accent2); border-left-color: var(--accent); }
-.nav-item .icon { font-size: 18px; width: 24px; text-align: center; }
+.sidebar-nav { flex:1; padding: 8px 0; display: flex; flex-direction: column; overflow-y: auto; }
+/* Tree Navigation */
 .nav-spacer { flex:1; }
+.tree-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; cursor: pointer;
+  color: var(--text2); font-size: 13px;
+  border-left: 3px solid transparent;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  user-select: none; min-height: 30px;
+}
+.tree-item:hover { background: var(--surface2); color: var(--text); }
+.tree-item.active { background: var(--surface2); color: var(--accent2); border-left-color: var(--accent); }
+.tree-item .icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+.tree-item .status-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+.tree-item .label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.tree-toggle { width: 16px; font-size: 10px; flex-shrink: 0; text-align: center; color: var(--text2); transition: transform 0.15s; }
+.tree-parent.expanded > .tree-toggle { transform: rotate(90deg); }
+.tree-children { display: none; }
+.tree-children.expanded { display: block; }
+.tree-item.lvl-1 { padding-left: 36px; font-size: 12px; }
+.tree-item.lvl-2 { padding-left: 52px; font-size: 12px; }
+.tree-item.lvl-3 { padding-left: 68px; font-size: 11px; }
+.tree-badge { font-size: 10px; color: var(--text2); background: var(--border); padding: 1px 6px; border-radius: 8px; margin-left: auto; flex-shrink: 0; }
+.tree-status { font-size: 11px; margin-left: auto; flex-shrink: 0; color: var(--text2); }
 .main { flex:1; display: flex; flex-direction: column; overflow: hidden; }
 .topbar { padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; background: var(--surface); flex-shrink: 0; }
 .topbar .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -57,13 +76,28 @@ body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: va
 .bp-item .num { color: var(--accent2); font-weight: 600; min-width: 50px; }
 .bp-item .title { flex:1; }
 .bp-item .role { color: var(--text2); font-size: 11px; padding: 2px 8px; background: var(--surface2); border-radius: 4px; }
+.dl-table { width: 100%; border-collapse: collapse; }
+.dl-table th { text-align: left; padding: 6px 8px; font-size: 11px; color: var(--text2); border-bottom: 1px solid var(--border); font-weight: 500; }
+.dl-table td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.dl-table tr:hover td { background: var(--surface2); }
+.dl-table .ch-link { color: var(--accent2); cursor: pointer; text-decoration: underline; }
+.status-tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+.status-tag.draft { background: var(--surface2); color: var(--text2); }
+.status-tag.reviewed { background: #3b82f6; color: #fff; }
 .toast { position: fixed; top: 16px; right: 16px; padding: 12px 20px; border-radius: var(--radius); font-size: 14px; z-index: 100; animation: fadeIn 0.3s; }
 .toast.success { background: var(--green); color: #000; }
 .toast.error { background: var(--red); color: #fff; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; } }
 
 /* Bottom Split Panel */
-.bottom-panel { position: fixed; bottom: 0; left: 220px; right: 0; height: 320px; display: flex; z-index: 10; border-top: 1px solid var(--border); }
+.bottom-panel { position: fixed; bottom: 0; left: 220px; right: 0; height: 320px; display: flex; z-index: 10; border-top: 1px solid var(--border); transition: height 0.2s; }
+.bottom-panel.collapsed { height: 32px; }
+.bottom-panel.collapsed .log-side .log-body,
+.bottom-panel.collapsed .content-side .content-body { display: none; }
+.bottom-panel.collapsed .log-side .log-hdr,
+.bottom-panel.collapsed .content-side .content-hdr { border-bottom: none; }
+.bottom-toggle { cursor: pointer; padding: 2px 8px; border: none; background: var(--surface2); color: var(--text2); border-radius: 4px; font-size: 14px; margin-left: 8px; }
+.bottom-toggle:hover { background: var(--border); color: var(--text); }
 .log-side { width: 16.66%; min-width: 200px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
 .log-side .log-hdr { padding: 6px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text2); flex-shrink: 0; }
 .log-side .log-body { flex:1; overflow-y: auto; padding: 6px 12px; font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.5; }
@@ -80,21 +114,97 @@ body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: va
 .content-body .thinking { color: #6e7681; font-style: italic; }
 .main-content { flex:1; overflow-y: auto; padding-bottom: 324px; }
 .main-content .content { padding: 24px; }
+
+/* Landing Page */
+#landing { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--bg);
+  flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+#landing.show { display: flex; }
+#landing .landing-logo { font-size: 48px; color: var(--accent2); letter-spacing: 4px; font-weight: 700; }
+#landing .landing-sub { font-size: 16px; color: var(--text2); margin-bottom: 16px; max-width: 480px; text-align: center; line-height: 1.8; }
+#landing .landing-btns { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+#landing .landing-btn { padding: 16px 48px; border: 2px solid var(--accent); border-radius: 12px;
+  font-size: 20px; cursor: pointer; transition: all 0.15s; background: var(--accent); color: #fff;
+  display: flex; align-items: center; gap: 10px; }
+#landing .landing-btn:hover { background: var(--accent2); border-color: var(--accent2); transform: translateY(-2px); }
+#landing .landing-btn.alt { background: transparent; color: var(--accent2); border-color: var(--border); }
+#landing .landing-btn.alt:hover { border-color: var(--accent); background: var(--surface2); }
+#landing .landing-recent { margin-top: 8px; font-size: 13px; color: var(--text2); max-width: 480px; width: 100%; }
+#landing .landing-recent .recent-item { padding: 8px 12px; cursor: pointer; border-radius: 6px; display: flex; align-items: center; gap: 8px; }
+#landing .landing-recent .recent-item:hover { background: var(--surface2); }
+#landing .landing-recent .recent-item .name { flex:1; color: var(--text); }
+#landing .landing-recent .recent-item .path { font-size: 11px; color: var(--text2); }
+
+/* workspace wrapper */
+#workspace.show { display: flex; }
+#workspace { display: none; }
 </style>
 </head>
 <body>
 
+<!-- Landing Page -->
+<div id="landing">
+  <div class="landing-logo">妙笔</div>
+  <div class="landing-sub">AI 长篇商业小说创作引擎<br>全自动写稿·修稿·审稿·定稿流水线</div>
+  <div class="landing-btns">
+    <button class="landing-btn" onclick="landingNewProject()">📁 新建项目</button>
+    <button class="landing-btn alt" onclick="landingOpenProject()">📂 打开已有项目</button>
+  </div>
+  <div class="landing-recent" id="landingRecent"></div>
+</div>
+
+<!-- Workspace -->
+<div id="workspace">
 <div class="sidebar">
   <div class="sidebar-header"><h1>妙笔</h1><p>AI 写作引擎</p></div>
-  <div class="sidebar-nav">
-    <div class="nav-item active" data-panel="config"><span class="icon">⚙️</span><span>项目配置</span></div>
-    <div class="nav-item" data-panel="architect"><span class="icon">🏗️</span><span>故事架构</span></div>
-    <div class="nav-item" data-panel="blueprint"><span class="icon">📋</span><span>章节蓝图</span></div>
-    <div class="nav-item" data-panel="write"><span class="icon">✍️</span><span>章节写作</span></div>
-    <div class="nav-item" data-panel="oneclick"><span class="icon">🚀</span><span>一键完成</span></div>
-    <div class="nav-item" data-panel="post"><span class="icon">🔧</span><span>修/审/定</span></div>
+  <div class="sidebar-nav" id="sidebarNav">
+    <!-- 项目 -->
+    <div class="tree-item tree-parent expanded" data-id="project" onclick="toggleTree(this)">
+      <span class="tree-toggle">▶</span><span class="icon">📁</span><span class="label">项目</span>
+    </div>
+    <div class="tree-children expanded" data-parent="project">
+      <div class="tree-item lvl-1 active" data-id="config" data-type="config" onclick="selectTreeItem(this)"><span class="icon">⚙️</span><span class="label">项目配置</span><span class="tree-badge" id="tree-config-badge"></span></div>
+      <div class="tree-item lvl-1" data-id="arch-form" data-type="arch-form" onclick="selectTreeItem(this)"><span class="icon">🚀</span><span class="label">生成架构</span></div>
+    </div>
+    <!-- 故事架构 -->
+    <div class="tree-item tree-parent" data-id="architect" onclick="toggleTree(this)">
+      <span class="tree-toggle">▶</span><span class="icon">🏗️</span><span class="label">故事架构</span>
+    </div>
+    <div class="tree-children" data-parent="architect">
+      <div class="tree-item lvl-1" data-id="arch-premise" data-type="arch" data-arch="premise" onclick="selectTreeItem(this)"><span class="status-icon">⬜</span><span class="label">故事前提</span></div>
+      <div class="tree-item lvl-1" data-id="arch-characters" data-type="arch" data-arch="characters" onclick="selectTreeItem(this)"><span class="status-icon">⬜</span><span class="label">角色图谱</span></div>
+      <div class="tree-item lvl-1" data-id="arch-worldbuilding" data-type="arch" data-arch="worldbuilding" onclick="selectTreeItem(this)"><span class="status-icon">⬜</span><span class="label">世界观矩阵</span></div>
+      <div class="tree-item lvl-1" data-id="arch-synopsis" data-type="arch" data-arch="synopsis" onclick="selectTreeItem(this)"><span class="status-icon">⬜</span><span class="label">情节大纲</span></div>
+      <div class="tree-item lvl-1" data-id="characters" data-type="characters" onclick="selectTreeItem(this)"><span class="icon">👤</span><span class="label">角色列表</span><span class="tree-badge" id="tree-char-badge"></span></div>
+    </div>
+    <!-- 章节蓝图 -->
+    <div class="tree-item tree-parent" data-id="blueprints" onclick="toggleTree(this)">
+      <span class="tree-toggle">▶</span><span class="icon">📋</span><span class="label">章节蓝图</span><span class="tree-badge" id="tree-bp-badge"></span>
+    </div>
+    <div class="tree-children" data-parent="blueprints" id="tree-bp-children">
+      <div class="tree-item lvl-1" data-id="bp-form" data-type="bp-form" onclick="selectTreeItem(this)"><span class="icon">🚀</span><span class="label">生成蓝图</span></div>
+    </div>
+    <!-- 章节目录 -->
+    <div class="tree-item tree-parent" data-id="chapters" onclick="toggleTree(this)">
+      <span class="tree-toggle">▶</span><span class="icon">📖</span><span class="label">章节目录</span>
+    </div>
+    <div class="tree-children" data-parent="chapters">
+      <div class="tree-item lvl-1" data-id="write" data-type="write" onclick="selectTreeItem(this)"><span class="icon">✍️</span><span class="label">撰写章节</span></div>
+      <div class="tree-item lvl-1" data-id="oneclick" data-type="oneclick" onclick="selectTreeItem(this)"><span class="icon">🚀</span><span class="label">一键完成</span></div>
+      <div class="tree-item lvl-1" data-id="oneclick-all" data-type="oneclick-all" onclick="selectTreeItem(this)"><span class="icon">🎯</span><span class="label">全部章节完成</span></div>
+      <div class="tree-item lvl-1" data-id="post" data-type="post" onclick="selectTreeItem(this)"><span class="icon">⚙️</span><span class="label">后续操作</span></div>
+      <div class="tree-item lvl-1" data-id="export" data-type="export" onclick="selectTreeItem(this)"><span class="icon">💾</span><span class="label">导出定稿TXT</span></div>
+      <div class="tree-item tree-parent" data-id="drafts-group" onclick="toggleTree(this)">
+        <span class="tree-toggle">▶</span><span class="icon">📝</span><span class="label">草稿列表</span><span class="tree-badge" id="tree-draft-badge"></span>
+      </div>
+      <div class="tree-children" data-parent="drafts-group" id="tree-drafts-children"></div>
+      <div class="tree-item tree-parent" data-id="finalized-group" onclick="toggleTree(this)">
+        <span class="tree-toggle">▶</span><span class="icon">📄</span><span class="label">定稿列表</span><span class="tree-badge" id="tree-finalized-badge"></span>
+      </div>
+      <div class="tree-children" data-parent="finalized-group" id="tree-finalized-children"></div>
+    </div>
     <div class="nav-spacer"></div>
-    <div class="nav-item" data-panel="settings"><span class="icon">🔌</span><span>LLM 设置</span></div>
+    <!-- 设置 -->
+    <div class="tree-item" data-id="settings" data-type="settings" onclick="selectTreeItem(this)"><span class="icon">🔌</span><span class="label">LLM 设置</span></div>
   </div>
 </div>
 
@@ -108,168 +218,35 @@ body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: va
     <span id="projectInfo" style="font-size:12px;color:var(--text2)"></span>
     <span style="flex:1"></span>
     <span id="stepIndicator" style="font-size:12px;color:var(--accent2);display:none"></span>
+    <button id="stopBtn" style="display:none;background:#e74c3c;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-left:8px" onclick="stopGeneration()">⏹ 停止生成</button>
   </div>
 
   <div class="main-content">
     <div class="content">
 
-      <!-- Settings Panel -->
-      <div id="panel-settings" class="panel">
-        <div class="card" style="border-color: var(--accent);">
-          <h3>🔌 大模型连接设置</h3>
-          <p style="color:var(--text2);font-size:13px;margin-bottom:16px">修改后即时生效，无需重启服务器</p>
-          <div class="form-grid">
-            <div class="form-group full"><label>API 地址 (Base URL)</label><input id="settings-baseUrl" placeholder="https://api.openai.com/v1"></div>
-            <div class="form-group full"><label>API 密钥</label>
-              <div style="display:flex;gap:8px">
-                <input id="settings-apiKey" type="password" placeholder="sk-..." style="flex:1">
-                <button class="btn btn-secondary" onclick="toggleApiKey()" title="显示/隐藏">👁</button>
-              </div>
-            </div>
-            <div class="form-group"><label>模型名称</label><input id="settings-model" placeholder="deepseek-v4-pro"></div>
-            <div class="form-group"><label>每章默认字数</label><input id="settings-wordsPerChapter" type="number" value="3000" min="500" max="20000"></div>
-            <div class="form-group"><label>默认总章数</label><input id="settings-totalChapters" type="number" value="100" min="10" max="5000"></div>
-          </div>
-          <div class="btn-group" style="margin-top:12px">
-            <button class="btn btn-primary" onclick="saveSettings()">保存设置</button>
-            <button class="btn btn-secondary" onclick="loadSettings()">重新加载</button>
-            <span id="settingsStatus" style="font-size:12px;color:var(--text2)"></span>
-          </div>
+      <!-- Content Viewer: 通用内容展示区 -->
+      <div id="panel-content" class="panel active">
+        <div class="card" id="content-viewer-card" style="display:none">
+          <h3 id="content-viewer-title">内容</h3>
+          <div id="content-viewer-body" style="font-size:14px;line-height:2;white-space:pre-wrap;max-height:calc(100vh - 420px);overflow-y:auto"></div>
         </div>
-        <div class="card">
-          <h3>连接状态</h3>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px" id="settings-info"></div>
-        </div>
-      </div>
-
-      <!-- Config Panel -->
-      <div id="panel-config" class="panel active">
-        <div class="card">
-          <h3>已生成配置 <span id="config-exists-badge" style="font-size:12px;color:var(--text2);display:none"></span></h3>
-          <div id="config-display" style="display:none">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:12px" id="config-short"></div>
-            <details style="margin-bottom:12px"><summary style="cursor:pointer;color:var(--accent2);font-size:13px">📖 展开查看全部配置</summary>
-              <div id="config-full" style="margin-top:8px;font-size:13px"></div>
-            </details>
-          </div>
-          <div id="config-empty" style="color:var(--text2);font-size:13px;padding:8px 0">暂无配置数据，请使用下方表单生成。</div>
-        </div>
-        <div class="card">
-          <h3>一键配置生成</h3>
-          <div class="form-group full" style="margin-bottom:12px">
-            <label>你的小说灵感/构思</label>
-            <textarea id="config-idea" placeholder="例如：一个废柴少年意外获得上古神器，从此逆天改命..." rows="3"></textarea>
-          </div>
-          <div class="form-grid">
-            <div class="form-group"><label>总章节数</label><input id="config-chapters" type="number" value="100" min="10" max="5000"></div>
-            <div class="form-group"><label>每章字数</label><input id="config-words" type="number" value="3000" min="1000" max="20000"></div>
-          </div>
-          <div class="btn-group" style="margin-top:12px">
-            <button class="btn btn-primary" onclick="generateConfig()">开始生成配置</button>
+        <div id="content-empty" style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--text2);font-size:14px">
+          <div style="text-align:center">
+            <div style="font-size:48px;margin-bottom:16px">📖</div>
+            <div>从左侧导航树选择项目查看内容</div>
           </div>
         </div>
       </div>
 
-      <!-- Architect Panel -->
-      <div id="panel-architect" class="panel">
-        <div class="card" id="architect-display-card" style="display:none">
-          <h3>已生成架构 <span id="architect-status" style="font-size:12px;color:var(--text2)"></span></h3>
-          <div id="architect-display"></div>
-          <button class="btn btn-primary" onclick="extractCharacters()" style="margin-top:12px">📇 从角色图谱提取角色卡</button>
-        </div>
-        <div class="card">
-          <h3>故事架构四步生成</h3>
-          <div class="step-checks" style="margin-bottom:16px">
-            <label><input type="checkbox" checked id="step-premise"><span>1. 故事前提</span></label>
-            <label><input type="checkbox" checked id="step-characters"><span>2. 角色图谱</span></label>
-            <label><input type="checkbox" checked id="step-world"><span>3. 世界观矩阵</span></label>
-            <label><input type="checkbox" checked id="step-synopsis"><span>4. 情节大纲</span></label>
-          </div>
-          <div class="form-group full" style="margin-bottom:12px">
-            <label>每步微操指导 (JSON，可选)</label>
-            <textarea id="architect-guidance" placeholder='{"premise":"重点突出主角身世"}' rows="2"></textarea>
-          </div>
-          <button class="btn btn-primary" onclick="generateArchitecture()">开始生成架构</button>
-        </div>
-      </div>
-
-      <!-- Blueprint Panel -->
-      <div id="panel-blueprint" class="panel">
-        <div class="card">
-          <h3>章节蓝图生成</h3>
-          <div class="form-grid" style="margin-bottom:12px">
-            <div class="form-group"><label>模式</label><select id="bp-mode"><option value="full">全部重新生成</option><option value="append">追加续写</option></select></div>
-            <div class="form-group"><label>起始章号</label><input id="bp-start" type="number" placeholder="自动" min="1"></div>
-            <div class="form-group"><label>生成章数</label><input id="bp-count" type="number" placeholder="默认到总章数" min="1"></div>
-            <div class="form-group"><label>节奏指导</label><input id="bp-pacing" placeholder="每10章一小高潮"></div>
-          </div>
-          <button class="btn btn-primary" onclick="generateBlueprint()">生成蓝图</button>
-        </div>
-        <div class="card">
-          <h3>已有蓝图 <span id="bp-total" style="color:var(--accent2);font-size:12px"></span></h3>
-          <div class="bp-list" id="bp-list"><span style="color:var(--text2)">加载中...</span></div>
-        </div>
-      </div>
-
-      <!-- Write Panel -->
-      <div id="panel-write" class="panel">
-        <div class="card">
-          <h3>撰写章节草稿</h3>
-          <div class="form-grid">
-            <div class="form-group"><label>章节号</label><input id="write-ch" type="number" min="1" placeholder="1"></div>
-            <div class="form-group"><label>章标题</label><input id="write-title" placeholder="留空从蓝图读取"></div>
-            <div class="form-group"><label>章角色</label><input id="write-role" value="发展" placeholder="发展/高潮/转折"></div>
-            <div class="form-group"><label>悬念钩子</label><input id="write-hook" placeholder="上章悬念"></div>
-            <div class="form-group full"><label>章目的</label><input id="write-purpose" placeholder="本章推进什么"></div>
-            <div class="form-group full"><label>关键事件</label><input id="write-events" placeholder="本章关键事件"></div>
-            <div class="form-group full"><label>角色列表</label><input id="write-chars" placeholder="逗号分隔"></div>
-            <div class="form-group full"><label>微操指导</label><textarea id="write-guidance" placeholder="本章特殊要求" rows="2"></textarea></div>
-          </div>
-          <div class="btn-group" style="margin-top:12px">
-            <button class="btn btn-primary" onclick="writeChapter()">开始写稿</button>
-            <button class="btn btn-green" onclick="oneClickFromWrite()">一键完成本章</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- One-Click Panel -->
-      <div id="panel-oneclick" class="panel">
-        <div class="card" style="border-color: var(--accent);">
-          <h3>一键完成 — 写稿→修稿→审稿→修复→定稿</h3>
-          <p style="color:var(--text2);font-size:13px;margin-bottom:12px">5 步全自动，无需人工干预</p>
-          <div class="form-grid">
-            <div class="form-group"><label>章节号</label><input id="oc-ch" type="number" min="1" placeholder="1"></div>
-            <div class="form-group"><label>章标题</label><input id="oc-title" placeholder="留空从蓝图读取"></div>
-            <div class="form-group"><label>章角色</label><input id="oc-role" value="发展"></div>
-            <div class="form-group"><label>审稿聚焦</label><input id="oc-focus" placeholder="人设一致性"></div>
-            <div class="form-group full"><label>关键事件</label><input id="oc-events" placeholder="本章关键事件"></div>
-            <div class="form-group full"><label>角色列表</label><input id="oc-chars" placeholder="逗号分隔"></div>
-            <div class="form-group full"><label>微操指导</label><textarea id="oc-guidance" rows="2" placeholder="对本章的特殊要求"></textarea></div>
-          </div>
-          <button class="btn btn-green" style="margin-top:12px;font-size:16px;padding:12px 32px" onclick="oneClick()">一键完成</button>
-        </div>
-      </div>
-
-      <!-- Post Panel -->
-      <div id="panel-post" class="panel">
-        <div class="card">
-          <h3>单独操作</h3>
-          <div class="form-grid" style="margin-bottom:12px">
-            <div class="form-group"><label>章节号</label><input id="post-ch" type="number" min="1" placeholder="1"></div>
-            <div class="form-group"><label>章标题</label><input id="post-title" placeholder="留空自动读取"></div>
-          </div>
-          <div class="btn-group">
-            <button class="btn btn-secondary" onclick="refineChapter()">AI 修稿</button>
-            <button class="btn btn-secondary" onclick="reviewChapter()">一致性审稿</button>
-            <button class="btn btn-primary" onclick="finalizeChapter()">定稿</button>
-          </div>
-        </div>
+      <!-- Form panels -->
+      <div id="panel-form" class="panel">
+        <div id="form-container"></div>
       </div>
 
     </div>
   </div>
 
-  <!-- Bottom Panel: Log (1/6) + Content (5/6) -->
+  <!-- Bottom Panel: Log + Content -->
   <div class="bottom-panel" id="bottomPanel">
     <div class="log-side">
       <div class="log-hdr">
@@ -281,13 +258,18 @@ body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: va
     <div class="content-side">
       <div class="content-hdr">
         <span>📝 生成内容</span>
-        <span id="contentWordCount" style="color:var(--text2)"></span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span id="contentWordCount" style="color:var(--text2)"></span>
+          <button class="bottom-toggle" onclick="toggleBottomPanel()" title="折叠/展开底部面板">▲</button>
+        </span>
       </div>
       <div class="content-body" id="contentBody">
         <span style="color:var(--text2)">这里将实时显示 AI 生成的文本内容...</span>
       </div>
     </div>
   </div>
+</div>
+
 </div>
 
 <!-- New Project Modal -->
@@ -305,7 +287,6 @@ body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: va
         <button class="btn btn-secondary" onclick="browseFolder()" style="padding:8px 16px;white-space:nowrap">📁 浏览...</button>
       </div>
     </div>
-    </div>
     <div style="color:var(--text2);font-size:12px;margin-bottom:12px">如果目录不存在将自动创建。将在该目录下创建 .miaobi 数据库和 .env 配置。</div>
     <div class="btn-group">
       <button class="btn btn-primary" onclick="createProject()">创建 / 打开</button>
@@ -320,165 +301,53 @@ const logBody = document.getElementById('logBody')
 const contentBody = document.getElementById('contentBody')
 let streamingActive = false
 
-// === Socket handlers ===
-socket.on('connect', () => { appendLog('info','✅ 已连接'); loadProjects(); loadSettings() })
-socket.on('disconnect', () => appendLog('error','❌ 断开'))
+// ======== Tree Navigation ========
+function toggleTree(el) {
+  const parentId = el.dataset.id
+  el.classList.toggle('expanded')
+  const children = document.querySelector(`.tree-children[data-parent="${parentId}"]`)
+  if (children) children.classList.toggle('expanded')
+}
 
-// 流式内容
-socket.on('stream', chunk => {
-  if (!streamingActive) { contentBody.textContent = ''; streamingActive = true }
-  // 简单渲染：<think> 标签内容用灰色斜体
-  const t = contentBody.textContent
-  contentBody.textContent = t + chunk
-  contentBody.scrollTop = contentBody.scrollHeight
-  updateWordCount()
-})
-
-// 步骤开始 → 重置内容区
-socket.on('stream-reset', () => {
-  contentBody.textContent = ''
-  streamingActive = true
-  updateWordCount()
-})
-
-socket.on('log', data => {
-  if (data.type==='log') appendLog('info',data.message)
-  if (data.type==='step-start') {
-    appendLog('step',`━━━ ${data.name} [${data.index+1}/${data.total}] ━━━`)
-    document.getElementById('stepIndicator').textContent = `⏳ ${data.name}`
-    document.getElementById('stepIndicator').style.display = 'block'
+function selectTreeItem(el) {
+  document.querySelectorAll('.tree-item.active').forEach(i => i.classList.remove('active'))
+  el.classList.add('active')
+  const type = el.dataset.type
+  if (!type) return
+  switch (type) {
+    case 'config': showConfigView(); break
+    case 'arch-form': showArchForm(); break
+    case 'arch': showArchContent(el.dataset.arch); break
+    case 'characters': showCharacterListView(); break
+    case 'bp-form': showBPForm(); break
+    case 'settings': showSettingsView(); break
+    case 'write': showWriteForm(0); break
+    case 'oneclick': showOneClickForm(0); break
+    case 'oneclick-all': showOneClickAllForm(); break
+    case 'post': showPostForm(0); break
+    case 'export': exportFinalized(); break
+    case 'draft': viewDraft(el.dataset.ch, el.dataset.ver); break
+    case 'finalized': viewFinalized(el.dataset.ch); break
+    case 'bp-chapter': showBPDetail(parseInt(el.dataset.ch)); break
   }
-  if (data.type==='step-done') {
-    appendLog('done',`✅ ${data.name} 完成`)
-    document.getElementById('stepIndicator').style.display = 'none'
-    streamingActive = false
-    updateWordCount()
-  }
-  if (data.type==='done') {
-    appendLog('done',`🎉 ${data.message||'操作完成'}`)
-    document.getElementById('stepIndicator').style.display = 'none'
-    streamingActive = false
-    updateWordCount()
-  }
-  if (data.type==='error') {
-    appendLog('error',`❌ ${data.message}`)
-    showToast('操作失败: '+data.message,'error')
-    document.getElementById('stepIndicator').style.display = 'none'
-  }
-})
-
-function appendLog(c,m){ const d=document.createElement('div'); d.className='line '+c; d.textContent=m; logBody.appendChild(d); logBody.scrollTop=logBody.scrollHeight }
-function clearLogs(){ logBody.innerHTML='<div class="line info">已清空</div>' }
-
-function updateWordCount() {
-  const t = contentBody.textContent || ''
-  const wc = t.replace(/\s/g,'').length
-  document.getElementById('contentWordCount').textContent = wc ? `${wc} 字` : ''
 }
 
-// === Nav ===
-document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', ()=>{
-  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'))
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'))
-  item.classList.add('active')
-  document.getElementById('panel-'+item.dataset.panel).classList.add('active')
-  if (item.dataset.panel==='config') loadConfigDisplay()
-  if (item.dataset.panel==='architect') loadArchitectDisplay()
-  if (item.dataset.panel==='blueprint') loadBlueprints()
-  if (item.dataset.panel==='settings') loadSettings()
-}))
-
-// === Toast ===
-function showToast(m,t){ const e=document.createElement('div'); e.className='toast '+t; e.textContent=m; document.body.appendChild(e); setTimeout(()=>e.remove(),3000) }
-
-// === Projects ===
-async function loadProjects(){
-  try{
-    const r=await fetch('/api/projects'); const d=await r.json()
-    const sel=document.getElementById('projectSelect')
-    const projects=d.projects||[]
-    sel.innerHTML=projects.length>0
-      ? projects.map(p=>`<option value="${esc(p.path)}" ${p.path===d.currentPath?'selected':''}>${esc(p.name)} — ${esc(p.path)}</option>`).join('')
-      : '<option value="">（无项目）</option>'
-    // 如果没有项目，强制弹出新建对话框
-    if(!projects.length){
-      showNewProjectDialog()
-      // 防止用户关闭对话框（无项目时无法使用）
-      document.getElementById('newProjectModal').onclick=function(e){ if(e.target===this) this.style.display='flex' }
-    }
-    refreshStatus()
-  }catch(e){}
+// ======== Content Panel ========
+function showContentPanel(title, html) {
+  document.getElementById('panel-form').classList.remove('active')
+  document.getElementById('panel-content').classList.add('active')
+  document.getElementById('content-empty').style.display = 'none'
+  document.getElementById('content-viewer-card').style.display = ''
+  document.getElementById('content-viewer-title').textContent = title
+  document.getElementById('content-viewer-body').innerHTML = html
+}
+function showFormPanel(html) {
+  document.getElementById('panel-content').classList.remove('active')
+  document.getElementById('panel-form').classList.add('active')
+  document.getElementById('form-container').innerHTML = html
 }
 
-async function switchProject(path){
-  if(!path) return
-  if(!confirm('切换项目将刷新所有状态，确认切换到：'+path+'？')) { loadProjects(); return }
-  try{
-    const r=await fetch('/api/projects/switch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})})
-    if(!r.ok){ const e=await r.json(); showToast('切换失败: '+e.error,'error'); loadProjects(); return }
-    showToast('项目已切换','success')
-    loadProjects()
-  }catch(e){ showToast('网络错误','error') }
-}
-
-function showNewProjectDialog(){
-  document.getElementById('newProjectModal').style.display='flex'
-  document.getElementById('newProjectName').focus()
-}
-
-async function createProject(){
-  const name=document.getElementById('newProjectName').value.trim()
-  const path=document.getElementById('newProjectPath').value.trim()
-  if(!path) return showToast('请输入项目目录路径','error')
-  document.getElementById('newProjectModal').style.display='none'
-  // 恢复正常关闭行为
-  document.getElementById('newProjectModal').onclick=function(e){ if(e.target===this) this.style.display='none' }
-  try{
-    const r=await fetch('/api/projects/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path,name:name||undefined})})
-    if(!r.ok){ const e=await r.json(); showToast('创建失败: '+e.error,'error'); return }
-    showToast('项目已创建','success')
-    loadProjects()
-  }catch(e){ showToast('网络错误','error') }
-}
-
-let _browsing=false
-async function browseFolder(){
-  if(_browsing) return
-  _browsing=true
-  const btn=document.querySelector('#newProjectModal button[onclick="browseFolder()"]')
-  if(btn){ btn.disabled=true; btn.textContent='⏳ 选择中...' }
-  try{
-    const r=await fetch('/api/dialog/select-folder',{method:'POST'})
-    const d=await r.json()
-    if(!r.ok){ showToast('打开对话框失败: '+d.error,'error'); return }
-    if(d.cancelled) return
-    document.getElementById('newProjectPath').value=d.path
-  }catch(e){ showToast('打开对话框失败','error') }
-  finally{ _browsing=false; if(btn){ btn.disabled=false; btn.textContent='📁 浏览...' } }
-}
-
-// === Status ===
-async function refreshStatus(){
-  try{
-    const r=await fetch('/api/status'); const s=await r.json()
-    document.getElementById('statusDot').className='dot '+(s.ok&&s.llmConfigured?'green':'red')
-    document.getElementById('statusText').textContent=s.llmConfigured?`已连接 (${s.model})`:'未配置 LLM'
-    let parts=[`目录: ${pathBasename(s.projectPath)}`]
-    if(s.configItems>0) parts.push(`⚙️项目配置(${s.configItems}项)`)
-    if(s.architectureSteps.length>0) parts.push(`🏗️架构已完成`)
-    if(s.totalPlanned>0) parts.push(`📋蓝图${s.totalPlanned}章`)
-    if(s.characterCount>0) parts.push(`👤角色${s.characterCount}人`)
-    if(s.draftCount>0) parts.push(`✍️草稿${s.draftCount}篇`)
-    if(s.totalChapters>0) parts.push(`📖已完成${s.totalChapters}章`)
-    if(parts.length===1) parts.push('（新项目）')
-    document.getElementById('projectInfo').textContent=parts.join(' | ')
-    // 同步加载配置/架构展示
-    if(s.configItems>0) loadConfigDisplay()
-    if(s.architectureSteps.length>0) loadArchitectDisplay()
-  }catch(e){ document.getElementById('statusText').textContent='服务器未连接' }
-}
-function pathBasename(p){ return (p||'').split(/[\\/]/).pop()||p }
-
+// ======== Config ========
 const CONFIG_LABELS = {
   genre:'类型', sub_genre:'子类型', target_audience:'目标受众', plot_structure:'情节结构',
   narrative_pov:'叙事视角', core_outline:'核心梗概', world_setting:'世界观',
@@ -488,213 +357,727 @@ const CONFIG_LABELS = {
 const CONFIG_KEYS_SHORT = ['genre','sub_genre','plot_structure','target_audience','narrative_pov','words_per_chapter','total_chapters']
 const CONFIG_KEYS_FULL = ['core_outline','world_setting','golden_finger','protagonist_profile','global_guidance','writing_style']
 
-async function loadConfigDisplay(){
-  try{
-    const r=await fetch('/api/novel-config'); const cfg=await r.json()
-    const keys=Object.keys(cfg)
-    if(keys.length===0){ document.getElementById('config-empty').style.display=''; document.getElementById('config-display').style.display='none'; return }
-    document.getElementById('config-empty').style.display='none'
-    document.getElementById('config-display').style.display=''
-    document.getElementById('config-exists-badge').style.display=''; document.getElementById('config-exists-badge').textContent=`(${keys.length}项)`
-    // 简短字段
-    let html=''
-    for(const k of CONFIG_KEYS_SHORT){
-      if(cfg[k]) html+=`<div><span style="color:var(--text2)">${CONFIG_LABELS[k]||k}</span>: ${escapeHtml(String(cfg[k]))}</div>`
+async function showConfigView() {
+  try {
+    const r = await fetch('/api/novel-config'); const cfg = await r.json()
+    const keys = Object.keys(cfg)
+    let html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    html += `<span style="color:var(--text2);font-size:12px">共 ${keys.length} 项</span>`
+    html += '<button class="btn btn-secondary" style="padding:4px 12px;font-size:11px" onclick="selectTreeItem(document.querySelector(\'[data-id=arch-form]\'));showArchForm();">⚡ 生成架构</button>'
+    html += '</div>'
+    if (keys.length === 0) {
+      html += '<div style="color:var(--text2);font-size:13px;padding:40px;text-align:center">暂无配置数据<br><button class="btn btn-primary" style="margin-top:16px" onclick="showConfigGenerateForm()">🚀 一键生成配置</button></div>'
+      showContentPanel('⚙️ 项目配置', html)
+      document.getElementById('tree-config-badge').textContent = ''
+      return
     }
-    document.getElementById('config-short').innerHTML=html
-    // 长文字段
-    html=''
-    for(const k of CONFIG_KEYS_FULL){
-      if(cfg[k]) html+=`<div style="margin-bottom:10px"><div style="color:var(--accent2);font-weight:600;margin-bottom:4px">${CONFIG_LABELS[k]||k}</div><div style="color:var(--text);white-space:pre-wrap;line-height:1.6">${escapeHtml(String(cfg[k]))}</div></div>`
+    document.getElementById('tree-config-badge').textContent = keys.length + '项'
+    for (const k of CONFIG_KEYS_SHORT) {
+      if (cfg[k]) html += `<div style="margin-bottom:6px"><span style="color:var(--accent2);font-weight:600">${CONFIG_LABELS[k]||k}:</span> <span style="color:var(--text)">${esc(cfg[k].substring(0,120))}${cfg[k].length>120?'...':''}</span></div>`
     }
-    document.getElementById('config-full').innerHTML=html||'<span style="color:var(--text2)">(无)</span>'
-  }catch(e){}
+    for (const k of CONFIG_KEYS_FULL) {
+      if (cfg[k]) html += `<details style="margin-top:8px"><summary style="cursor:pointer;color:var(--accent2);font-size:13px">📖 ${CONFIG_LABELS[k]||k} (${cfg[k].length}字)</summary><div style="margin-top:6px;white-space:pre-wrap;line-height:1.8;font-size:13px">${esc(cfg[k])}</div></details>`
+    }
+    showContentPanel('⚙️ 项目配置', html)
+  } catch (e) {}
 }
-function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function showConfigGenerateForm() {
+  showFormPanel(`<div class="card">
+    <h3>🚀 一键配置生成</h3>
+    <div class="form-group full" style="margin-bottom:12px">
+      <label>你的小说灵感/构思</label>
+      <textarea id="config-idea" placeholder="例如：一个废柴少年意外获得上古神器，从此逆天改命..." rows="3"></textarea>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>总章节数</label><input id="config-chapters" type="number" value="100" min="10" max="5000"></div>
+      <div class="form-group"><label>每章字数</label><input id="config-words" type="number" value="3000" min="1000" max="20000"></div>
+    </div>
+    <div class="btn-group" style="margin-top:12px">
+      <button class="btn btn-primary" onclick="generateConfig()">开始生成配置</button>
+      <button class="btn btn-secondary" onclick="selectTreeItem(document.querySelector('[data-id=config]'));showConfigView();">返回配置</button>
+    </div>
+  </div>`)
+}
 
-// === 架构展示 ===
+// ======== Architecture ========
 const ARCH_LABELS = { premise:'故事前提', characters:'角色图谱', worldbuilding:'世界观矩阵', synopsis:'情节大纲' }
-async function loadArchitectDisplay(){
-  try{
-    const r=await fetch('/api/project-core'); const data=await r.json()
-    const keys=Object.keys(data).filter(k=>ARCH_LABELS[k])
-    if(keys.length===0) return
-    const card=document.getElementById('architect-display-card')
-    card.style.display=''; document.getElementById('architect-status').textContent=`(${keys.length}/4 步已完成)`
-    let h=''
-    for(const k of ['premise','characters','worldbuilding','synopsis']){
-      h+=`<details style="margin-top:8px" ${data[k]?'':'open disabled'}><summary style="cursor:pointer;color:${data[k]?'var(--accent2)':'var(--text2)'};font-size:13px">${data[k]?'✅':'⬜'} ${ARCH_LABELS[k]||k} (${data[k]?data[k].length+'字':'未生成'})</summary>`
-      if(data[k]) h+=`<div style="margin-top:8px;color:var(--text);white-space:pre-wrap;line-height:1.6;font-size:13px;padding-left:12px;border-left:3px solid var(--surface2)">${escapeHtml(data[k].substring(0,2000))}${data[k].length>2000?'...':''}</div>`
-      h+='</details>'
+async function showArchContent(key) {
+  const data = window._archData || {}
+  const content = data[key] || ''
+  if (!content) {
+    showContentPanel(ARCH_LABELS[key]||key, '<div style="color:var(--text2);padding:40px;text-align:center">暂未生成<br><button class="btn btn-primary" style="margin-top:12px" onclick="showArchForm()">🚀 生成架构</button></div>')
+    return
+  }
+  showContentPanel(ARCH_LABELS[key]||key, `<div style="white-space:pre-wrap;line-height:2">${esc(content.substring(0, 10000))}${content.length>10000?'...':''}</div>`)
+}
+function showArchForm() {
+  showFormPanel(`<div class="card">
+    <h3>🏗️ 故事架构四步生成</h3>
+    <div class="step-checks" style="margin-bottom:16px">
+      <label><input type="checkbox" checked id="step-premise"><span>1. 故事前提</span></label>
+      <label><input type="checkbox" checked id="step-characters"><span>2. 角色图谱</span></label>
+      <label><input type="checkbox" checked id="step-world"><span>3. 世界观矩阵</span></label>
+      <label><input type="checkbox" checked id="step-synopsis"><span>4. 情节大纲</span></label>
+    </div>
+    <div class="form-group full" style="margin-bottom:12px">
+      <label>每步微操指导 (JSON，可选)</label>
+      <textarea id="architect-guidance" placeholder='{"premise":"重点突出主角身世"}' rows="2"></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="generateArchitecture()">开始生成架构</button>
+  </div>`)
+}
+
+async function loadArchitectDisplay() {
+  try {
+    const r = await fetch('/api/project-core'); const data = await r.json()
+    window._archData = data
+    const steps = ['premise', 'characters', 'worldbuilding', 'synopsis']
+    for (const k of steps) {
+      const el = document.querySelector(`[data-arch="${k}"] .status-icon`)
+      if (el) el.textContent = data[k] ? '✅' : '⬜'
     }
-    document.getElementById('architect-display').innerHTML=h
-  }catch(e){}
+    const completed = steps.filter(k => data[k]).length
+    if (completed > 0) {
+      const parent = document.querySelector('[data-id="architect"]')
+      if (parent) {
+        let badge = parent.querySelector('.tree-badge')
+        if (!badge) { badge = document.createElement('span'); badge.className = 'tree-badge'; parent.appendChild(badge) }
+        badge.textContent = `${completed}/4`
+      }
+    }
+    loadCharacterList()
+  } catch (e) {}
 }
 
-async function extractCharacters(){
-  clearLogs(); appendLog('step','开始从已有角色图谱中提取角色卡...')
-  await apiPost('/api/extract-characters',{},'角色提取已启动')
+// ======== Characters ========
+async function showCharacterListView() {
+  try {
+    const r = await fetch('/api/characters'); const chars = await r.json()
+    if (!chars.length) {
+      showContentPanel('👤 角色列表', '<div style="color:var(--text2);padding:40px;text-align:center">暂无角色数据<br><span style="font-size:12px">需要先生成「角色图谱」</span></div>')
+      document.getElementById('tree-char-badge').textContent = ''
+      return
+    }
+    document.getElementById('tree-char-badge').textContent = chars.length + '人'
+    const roleMap = { protagonist:'主角', antagonist:'反派', supporting:'配角', other:'其他' }
+    let html = ''
+    for (const c of chars) {
+      html += `<details style="margin-bottom:8px"><summary style="cursor:pointer;color:var(--accent2);font-size:14px;padding:6px 0">👤 ${esc(c.name)} — ${roleMap[c.role]||c.role||'未知'}</summary>`
+      html += '<div style="margin-left:16px;font-size:13px;line-height:1.8;display:grid;grid-template-columns:1fr 1fr;gap:4px">'
+      const fields = [['性别',c.gender],['年龄',c.age],['外貌',c.appearance],['性格',c.personality],['背景',c.background],['能力',c.abilities],['动机',c.motivation],['关系',c.relationships],['弧线',c.arc]]
+      for (const [l,v] of fields) { if (v) html += `<div><span style="color:var(--text2)">${l}:</span> ${esc(v)}</div>` }
+      html += '</div></details>'
+    }
+    showContentPanel('👤 角色列表', html)
+  } catch (e) {}
+}
+async function loadCharacterList() {
+  try {
+    const r = await fetch('/api/characters'); const chars = await r.json()
+    document.getElementById('tree-char-badge').textContent = chars.length ? chars.length + '人' : ''
+    window._charData = chars
+  } catch (e) {}
 }
 
-setInterval(refreshStatus,10000)
-
-// === Settings ===
-async function loadSettings(){
-  try{
-    const r=await fetch('/api/settings'); const c=await r.json()
-    document.getElementById('settings-baseUrl').value=c.baseUrl||''
-    document.getElementById('settings-apiKey').value=c.apiKey||''
-    document.getElementById('settings-model').value=c.model||''
-    document.getElementById('settings-wordsPerChapter').value=c.wordsPerChapter||3000
-    document.getElementById('settings-totalChapters').value=c.totalChapters||100
-    document.getElementById('settings-info').innerHTML=
-      `<div><span style="color:var(--text2)">API: </span>${esc(c.baseUrl||'未配置')}</div>
-       <div><span style="color:var(--text2)">模型: </span>${esc(c.model||'未配置')}</div>
-       <div><span style="color:var(--text2)">密钥: </span>${c.apiKey?'✅ 已配置 ('+c.apiKey.slice(0,8)+'...)':'❌ 未配置'}</div>
-       <div><span style="color:var(--text2)">项目: </span>${esc(c.projectPath||'')}</div>`
-  }catch(e){}
+// ======== Blueprints ========
+function showBPForm() {
+  showFormPanel(`<div class="card">
+    <h3>📋 章节蓝图生成</h3>
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-group"><label>模式</label><select id="bp-mode"><option value="full">全部重新生成</option><option value="append">追加续写</option></select></div>
+      <div class="form-group"><label>起始章号</label><input id="bp-start" type="number" placeholder="自动" min="1"></div>
+      <div class="form-group"><label>生成章数</label><input id="bp-count" type="number" placeholder="默认到总章数" min="1"></div>
+      <div class="form-group"><label>节奏指导</label><input id="bp-pacing" placeholder="每10章一小高潮"></div>
+    </div>
+    <button class="btn btn-primary" onclick="generateBlueprint()">生成蓝图</button>
+  </div>
+  <div class="card">
+    <h3>已有蓝图</h3>
+    <div id="bp-list-inline" style="max-height:400px;overflow-y:auto"><span style="color:var(--text2)">加载中...</span></div>
+  </div>`)
+  loadBPListInline()
+}
+async function loadBPListInline() {
+  try {
+    const r = await fetch('/api/blueprints'); const bps = await r.json()
+    const el = document.getElementById('bp-list-inline')
+    if (!el) return
+    if (!bps.length) { el.innerHTML = '<span style="color:var(--text2)">暂无蓝图</span>'; return }
+    el.innerHTML = bps.map(b => `<div class="bp-item" onclick="fillFromBlueprint(${b.chapterNumber})"><span class="num">第${b.chapterNumber}章</span><span class="title">${esc(b.title)}</span><span class="role">${esc(b.role)}</span></div>`).join('')
+  } catch (e) {}
+}
+async function loadBlueprints() {
+  try {
+    const r = await fetch('/api/blueprints'); const bps = await r.json()
+    document.getElementById('tree-bp-badge').textContent = bps.length ? bps.length + '章' : ''
+    const container = document.getElementById('tree-bp-children')
+    if (!container) return
+    container.querySelectorAll('.tree-item.lvl-1[data-type="bp-chapter"]').forEach(e => e.remove())
+    for (const b of bps) {
+      const div = document.createElement('div')
+      div.className = 'tree-item lvl-1'
+      div.dataset.type = 'bp-chapter'
+      div.dataset.ch = b.chapterNumber
+      div.innerHTML = `<span class="icon">📋</span><span class="label">第${b.chapterNumber}章 ${esc(b.title)}</span><span class="tree-status">${esc(b.role)}</span>`
+      div.onclick = function(e) { e.stopPropagation(); selectTreeItem(div) }
+      container.appendChild(div)
+    }
+  } catch (e) {}
 }
 
-async function saveSettings(){
-  const body={
+function fillFromBlueprint(ch) {
+  showWriteForm(ch)
+}
+async function showBPDetail(ch) {
+  try {
+    const r = await fetch(`/api/blueprint/${ch}`);
+    const bp = await r.json();
+    if (r.status === 404) {
+      showContentPanel(`📋 第${ch}章 蓝图`, '<div style="color:var(--text2);padding:40px;text-align:center">未找到该蓝图</div>');
+      return;
+    }
+    let html = '<div class="btn-group" style="margin-bottom:16px">'
+    html += `<button class="btn btn-primary" onclick="showWriteForm(${ch})">✍️ 基于此蓝图写稿</button>`
+    html += '<button class="btn btn-green" onclick="showOneClickForm(' + ch + ')">🚀 一键完成本章</button>'
+    html += '</div>'
+    html += '<div style="display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:13px;line-height:1.8">'
+    html += `<div style="color:var(--text2)">章节号</div><div>第${esc(bp.chapterNumber)}章</div>`
+    html += `<div style="color:var(--text2)">标题</div><div style="color:var(--accent2);font-weight:600">${esc(bp.title)}</div>`
+    html += `<div style="color:var(--text2)">角色</div><div>${esc(bp.role)}</div>`
+    if (bp.purpose) html += `<div style="color:var(--text2)">章节目的</div><div>${esc(bp.purpose)}</div>`
+    if (bp.keyEvents) html += `<div style="color:var(--text2)">关键事件</div><div>${esc(bp.keyEvents)}</div>`
+    if (bp.suspenseHook) html += `<div style="color:var(--text2)">悬念钩子</div><div>${esc(bp.suspenseHook)}</div>`
+    let chars = bp.characters; try { chars = typeof chars === 'string' ? JSON.parse(chars) : chars } catch(e) {}
+    if (Array.isArray(chars) && chars.length) html += `<div style="color:var(--text2)">角色列表</div><div>${esc(chars.join(', '))}</div>`
+    if (bp.userGuidance) html += `<div style="color:var(--text2);grid-column:1/-1;margin-top:12px;border-top:1px solid var(--border);padding-top:8px">微操指导</div><div style="grid-column:1/-1;white-space:pre-wrap">${esc(bp.userGuidance)}</div>`
+    if (bp.notes) html += `<div style="color:var(--text2);grid-column:1/-1;margin-top:8px">备注</div><div style="grid-column:1/-1;white-space:pre-wrap">${esc(bp.notes)}</div>`
+    html += '</div>'
+    showContentPanel(`📋 第${ch}章 ${esc(bp.title)}`, html)
+  } catch (e) { showContentPanel('错误', '<div style="color:var(--red)">加载失败</div>') }
+}
+
+// ======== Draft & Finalized ========
+async function loadDraftList() {
+  try {
+    const r = await fetch('/api/drafts'); const drafts = await r.json()
+    document.getElementById('tree-draft-badge').textContent = drafts.length || ''
+    const container = document.getElementById('tree-drafts-children')
+    if (!container) return
+    container.innerHTML = ''
+    const statusText = { draft:'草稿', reviewed:'已审', refined:'已修' }
+    const sorted = [...drafts].sort((a,b) => a.chapterNumber - b.chapterNumber || a.version - b.version)
+    for (const d of sorted) {
+      const div = document.createElement('div')
+      div.className = 'tree-item lvl-2'
+      div.dataset.type = 'draft'
+      div.dataset.ch = d.chapterNumber
+      div.dataset.ver = d.version
+      div.innerHTML = `<span class="label">第${d.chapterNumber}章 v${d.version}</span><span class="tree-status">${statusText[d.status]||d.status} ${d.wordCount||0}字</span>`
+      div.onclick = function(e) { e.stopPropagation(); selectTreeItem(div) }
+      container.appendChild(div)
+    }
+  } catch (e) {}
+}
+async function loadFinalizedList() {
+  try {
+    const r = await fetch('/api/finalized'); const list = await r.json()
+    document.getElementById('tree-finalized-badge').textContent = list.length || ''
+    const container = document.getElementById('tree-finalized-children')
+    if (!container) return
+    container.innerHTML = ''
+    for (const d of list) {
+      const div = document.createElement('div')
+      div.className = 'tree-item lvl-2'
+      div.dataset.type = 'finalized'
+      div.dataset.ch = d.chapterNumber
+      div.innerHTML = `<span class="label">第${d.chapterNumber}章</span><span class="tree-status">${d.wordCount||0}字</span>`
+      div.onclick = function(e) { e.stopPropagation(); selectTreeItem(div) }
+      container.appendChild(div)
+    }
+  } catch (e) {}
+}
+
+async function viewDraft(ch, ver) {
+  try {
+    const r = await fetch(`/api/draft-content?chapterNumber=${ch}&version=${ver}`)
+    const d = await r.json()
+    if (d.content) {
+      const wc = (d.content || '').replace(/\s/g, '').length
+      const statusText = { draft: '草稿', reviewed: '已审', refined: '已修', finalized: '定稿' }
+      showContentPanel(`✍️ 第${ch}章 ${statusText[d.status] || d.status || '草稿'} v${ver} (${wc}字)`,
+        `<div style="white-space:pre-wrap;line-height:2">${esc(d.content || '')}</div>
+        <div class="btn-group" style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+          <button class="btn btn-secondary" onclick="showWriteForm(${ch})">✍️ 写新草稿</button>
+          <button class="btn btn-secondary" onclick="refineChapterById(${ch})">🔧 AI 修稿</button>
+          <button class="btn btn-secondary" onclick="reviewChapterById(${ch})">🔍 一致性审稿</button>
+          <button class="btn btn-primary" onclick="finalizeChapterById(${ch})">✅ 定稿</button>
+          <button class="btn btn-green" onclick="showOneClickForm(${ch})">🚀 一键完成</button>
+        </div>`)
+    } else {
+      showContentPanel(`✍️ 第${ch}章 草稿 v${ver}`, '<div style="color:var(--text2);padding:40px;text-align:center">内容为空</div>')
+    }
+  } catch (e) { showContentPanel('错误', '<div style="color:var(--red)">加载失败</div>') }
+}
+async function viewFinalized(ch) {
+  try {
+    const r = await fetch(`/api/finalized-content?chapterNumber=${ch}`)
+    const d = await r.json()
+    if (d.content) {
+      showContentPanel(`📄 第${ch}章 定稿 (${(d.content||'').replace(/\\s/g,'').length}字)`, `<div style="white-space:pre-wrap;line-height:2">${esc(d.content||'')}</div>`)
+    } else {
+      showContentPanel(`📄 第${ch}章 定稿`, '<div style="color:var(--text2);padding:40px;text-align:center">内容为空</div>')
+    }
+  } catch (e) { showContentPanel('错误', '<div style="color:var(--red)">加载失败</div>') }
+}
+
+// ======== Write Form ========
+function showWriteForm(ch) {
+  showFormPanel(`<div class="card">
+    <h3>✍️ 撰写章节草稿</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>章节号</label><input id="write-ch" type="number" min="1" value="${ch||''}" placeholder="1"></div>
+      <div class="form-group"><label>章标题</label><input id="write-title" placeholder="留空从蓝图读取"></div>
+      <div class="form-group"><label>章角色</label><input id="write-role" value="发展" placeholder="发展/高潮/转折"></div>
+      <div class="form-group"><label>悬念钩子</label><input id="write-hook" placeholder="上章悬念"></div>
+      <div class="form-group full"><label>章目的</label><input id="write-purpose" placeholder="本章推进什么"></div>
+      <div class="form-group full"><label>关键事件</label><input id="write-events" placeholder="本章关键事件"></div>
+      <div class="form-group full"><label>角色列表</label><input id="write-chars" placeholder="逗号分隔"></div>
+      <div class="form-group full"><label>微操指导</label><textarea id="write-guidance" placeholder="本章特殊要求" rows="2"></textarea></div>
+    </div>
+    <div class="btn-group" style="margin-top:12px">
+      <button class="btn btn-primary" onclick="writeChapter()">开始写稿</button>
+      <button class="btn btn-green" onclick="oneClickFromWrite()">一键完成本章</button>
+    </div>
+  </div>`)
+}
+function oneClickFromWrite() {
+  const ch = parseInt(document.getElementById('write-ch').value)
+  if (!ch) return showToast('请先输入章节号', 'error')
+  showOneClickForm(ch)
+}
+
+// ======== One-Click (standalone) ========
+function showOneClickForm(ch) {
+  showFormPanel(`<div class="card" style="border-color: var(--accent);">
+    <h3>🚀 一键完成 — 写稿→修稿→审稿→修复→定稿</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:12px">5 步全自动，无需人工干预</p>
+    <div class="form-grid">
+      <div class="form-group"><label>章节号</label><input id="oc-ch" type="number" min="1" value="${ch||''}" placeholder="1"></div>
+      <div class="form-group"><label>章标题</label><input id="oc-title" placeholder="留空从蓝图读取"></div>
+      <div class="form-group"><label>章角色</label><input id="oc-role" value="发展" placeholder="发展/高潮/转折"></div>
+      <div class="form-group"><label>审稿聚焦</label><input id="oc-focus" placeholder="人设一致性,剧情合理性"></div>
+      <div class="form-group full"><label>关键事件</label><input id="oc-events" placeholder="本章关键事件"></div>
+      <div class="form-group full"><label>角色列表</label><input id="oc-chars" placeholder="逗号分隔"></div>
+      <div class="form-group full"><label>微操指导</label><textarea id="oc-guidance" rows="2" placeholder="对本章的特殊要求"></textarea></div>
+    </div>
+    <button class="btn btn-green" style="margin-top:12px;font-size:16px;padding:12px 32px" onclick="oneClick()">一键完成</button>
+  </div>`)
+}
+
+// ======== Post Operations ========
+function showPostForm(ch) {
+  showFormPanel(`<div class="card">
+    <h3>⚙️ 后续操作 — 修稿 / 审稿 / 定稿</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">对已有草稿进行后处理操作</p>
+    <div class="form-grid">
+      <div class="form-group"><label>章节号</label><input id="post-ch" type="number" min="1" value="${ch||''}" placeholder="1"></div>
+      <div class="form-group"><label>章标题 (定稿用)</label><input id="post-title" placeholder="留空自动读取"></div>
+    </div>
+    <div class="btn-group" style="margin-top:12px">
+      <button class="btn btn-secondary" onclick="refineChapter()">🔧 AI 修稿</button>
+      <button class="btn btn-secondary" onclick="reviewChapter()">🔍 一致性审稿</button>
+      <button class="btn btn-primary" onclick="finalizeChapter()">✅ 定稿</button>
+    </div>
+  </div>`)
+}
+
+async function refineChapter() { refineChapterById(parseInt(document.getElementById('post-ch').value)) }
+async function reviewChapter() { reviewChapterById(parseInt(document.getElementById('post-ch').value)) }
+async function finalizeChapter() { finalizeChapterById(parseInt(document.getElementById('post-ch').value)) }
+
+async function refineChapterById(ch) {
+  if (!ch) return showToast('请输入章节号', 'error')
+  clearLogs(); appendLog('step', `修稿 第${ch}章...`)
+  await apiPost('/api/refine', { chapterNumber: ch }, `第${ch}章修稿已启动`)
+}
+async function reviewChapterById(ch) {
+  if (!ch) return showToast('请输入章节号', 'error')
+  clearLogs(); appendLog('step', `审稿 第${ch}章...`)
+  await apiPost('/api/review', { chapterNumber: ch }, `第${ch}章审稿已启动`)
+}
+async function finalizeChapterById(ch) {
+  if (!ch) return showToast('请输入章节号', 'error')
+  const title = document.getElementById('post-title')?.value
+  clearLogs(); appendLog('step', `定稿 第${ch}章...`)
+  await apiPost('/api/finalize', { chapterNumber: ch, title: title || undefined }, `第${ch}章定稿已启动`)
+}
+
+// ======== Settings ========
+function showSettingsView() {
+  showFormPanel(`<div class="card" style="border-color: var(--accent);">
+    <h3>🔌 大模型连接设置</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">修改后即时生效，无需重启服务器</p>
+    <div class="form-grid">
+      <div class="form-group full"><label>API 地址 (Base URL)</label><input id="settings-baseUrl" placeholder="https://api.openai.com/v1"></div>
+      <div class="form-group full"><label>API 密钥</label>
+        <div style="display:flex;gap:8px">
+          <input id="settings-apiKey" type="password" placeholder="sk-..." style="flex:1">
+          <button class="btn btn-secondary" onclick="toggleApiKey()" title="显示/隐藏">👁</button>
+        </div>
+      </div>
+      <div class="form-group"><label>模型名称</label><input id="settings-model" placeholder="deepseek-v4-pro"></div>
+      <div class="form-group"><label>每章默认字数</label><input id="settings-wordsPerChapter" type="number" value="3000" min="500" max="20000"></div>
+      <div class="form-group"><label>默认总章数</label><input id="settings-totalChapters" type="number" value="100" min="10" max="5000"></div>
+    </div>
+    <div class="btn-group" style="margin-top:12px">
+      <button class="btn btn-primary" onclick="saveSettings()">保存设置</button>
+      <button class="btn btn-secondary" onclick="loadSettingsValues()">重新加载</button>
+      <span id="settingsStatus" style="font-size:12px;color:var(--text2)"></span>
+    </div>
+  </div>
+  <div class="card">
+    <h3>连接状态</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px" id="settings-info"></div>
+  </div>`)
+  setTimeout(loadSettingsValues, 100)
+}
+async function loadSettingsValues() {
+  try {
+    const r = await fetch('/api/settings'); const c = await r.json()
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val }
+    set('settings-baseUrl', c.baseUrl || '')
+    set('settings-apiKey', c.apiKey || '')
+    set('settings-model', c.model || '')
+    const wpc = document.getElementById('settings-wordsPerChapter'); if (wpc) wpc.value = c.wordsPerChapter || 3000
+    const tc = document.getElementById('settings-totalChapters'); if (tc) tc.value = c.totalChapters || 100
+    const info = document.getElementById('settings-info')
+    if (info) info.innerHTML = `<div><span style="color:var(--text2)">API: </span>${esc(c.baseUrl||'未配置')}</div>
+      <div><span style="color:var(--text2)">模型: </span>${esc(c.model||'未配置')}</div>
+      <div><span style="color:var(--text2)">密钥: </span>${c.apiKey?'✅ 已配置 ('+c.apiKey.slice(0,8)+'...)':'❌ 未配置'}</div>
+      <div><span style="color:var(--text2)">项目: </span>${esc(c.projectPath||'')}</div>`
+  } catch (e) {}
+}
+function toggleApiKey() { const el = document.getElementById('settings-apiKey'); if (el) el.type = el.type === 'password' ? 'text' : 'password' }
+
+// ======== Abort ========
+async function stopGeneration() {
+  try { await fetch('/api/abort', { method: 'POST' }) } catch {}
+  document.getElementById('stopBtn').style.display = 'none'
+  document.getElementById('stepIndicator').style.display = 'none'
+  streamingActive = false
+}
+
+// ======== Socket ========
+socket.on('connect', () => { appendLog('info', '✅ 已连接'); loadProjects(); loadSettingsValues() })
+socket.on('disconnect', () => appendLog('error', '❌ 断开'))
+
+socket.on('stream', chunk => {
+  if (!streamingActive) { contentBody.textContent = ''; streamingActive = true; document.getElementById('stopBtn').style.display = 'inline-block' }
+  contentBody.textContent = contentBody.textContent + chunk
+  contentBody.scrollTop = contentBody.scrollHeight
+  updateWordCount()
+})
+socket.on('stream-reset', () => {
+  contentBody.textContent = ''; streamingActive = true
+  document.getElementById('stopBtn').style.display = 'inline-block'
+  updateWordCount()
+})
+socket.on('log', data => {
+  if (data.type === 'log') appendLog('info', data.message)
+  if (data.type === 'step-start') {
+    appendLog('step', `━━━ ${data.name} [${data.index+1}/${data.total}] ━━━`)
+    document.getElementById('stepIndicator').textContent = `⏳ ${data.name}`
+    document.getElementById('stepIndicator').style.display = 'block'
+    document.getElementById('stopBtn').style.display = 'inline-block'
+  }
+  if (data.type === 'step-done') {
+    appendLog('done', `✅ ${data.name} 完成`)
+    document.getElementById('stepIndicator').style.display = 'none'
+    streamingActive = false; updateWordCount()
+  }
+  if (data.type === 'done') {
+    appendLog('done', `🎉 ${data.message || '操作完成'}`)
+    document.getElementById('stepIndicator').style.display = 'none'
+    document.getElementById('stopBtn').style.display = 'none'
+    streamingActive = false; updateWordCount()
+    loadDraftList(); loadFinalizedList(); loadBlueprints(); loadArchitectDisplay()
+    const active = document.querySelector('.tree-item.active')
+    if (active && active.dataset.type === 'config') showConfigView()
+  }
+  if (data.type === 'error') {
+    appendLog('error', `❌ ${data.message}`)
+    showToast('操作失败: ' + data.message, 'error')
+    document.getElementById('stepIndicator').style.display = 'none'
+    document.getElementById('stopBtn').style.display = 'none'
+  }
+})
+
+function appendLog(c, m) { const d = document.createElement('div'); d.className = 'line ' + c; d.textContent = m; logBody.appendChild(d); logBody.scrollTop = logBody.scrollHeight }
+function clearLogs() { logBody.innerHTML = '<div class="line info">已清空</div>' }
+function updateWordCount() {
+  const t = contentBody.textContent || ''; const wc = t.replace(/\s/g, '').length
+  document.getElementById('contentWordCount').textContent = wc ? `${wc} 字` : ''
+}
+
+// ======== Toast ========
+function showToast(m, t) { const e = document.createElement('div'); e.className = 'toast ' + t; e.textContent = m; document.body.appendChild(e); setTimeout(() => e.remove(), 3000) }
+
+// ======== Projects ========
+async function loadProjects() {
+  try {
+    const r = await fetch('/api/projects'); const d = await r.json()
+    const sel = document.getElementById('projectSelect')
+    sel.innerHTML = (d.projects || []).length > 0
+      ? d.projects.map(p => `<option value="${esc(p.path)}" ${p.path === d.currentPath ? 'selected' : ''}>${esc(p.name)} — ${esc(p.path)}</option>`).join('')
+      : '<option value="">（无项目）</option>'
+    refreshStatus()
+  } catch (e) {}
+}
+
+async function switchProject(path) {
+  if (!path) return
+  if (!confirm('切换项目将刷新所有状态，确认切换到：' + path + '？')) { loadProjects(); return }
+  try {
+    const r = await fetch('/api/projects/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) })
+    if (!r.ok) { const e = await r.json(); showToast('切换失败: ' + e.error, 'error'); loadProjects(); return }
+    clearLogs(); contentBody.textContent = ''
+    document.getElementById('stepIndicator').style.display = 'none'
+    document.getElementById('stopBtn').style.display = 'none'
+    streamingActive = false
+    showToast('项目已切换', 'success')
+    loadProjects()
+  } catch (e) { showToast('网络错误', 'error') }
+}
+function showNewProjectDialog() {
+  document.getElementById('newProjectModal').style.display = 'flex'
+  document.getElementById('newProjectName').focus()
+}
+
+// ======== Landing ========
+async function loadLandingRecent() {
+  try {
+    const r = await fetch('/api/projects'); const d = await r.json()
+    const projects = (d.projects || []).slice(0, 5)
+    const el = document.getElementById('landingRecent')
+    if (!projects.length) { el.innerHTML = ''; return }
+    el.innerHTML = '<div style="color:var(--text2);font-size:12px;margin-bottom:6px">最近项目 — 点击快速打开</div>'
+      + projects.map(p => `<div class="recent-item" onclick="landingOpenRecent('${esc(p.path)}')"><span>📂</span><span class="name">${esc(p.name)}</span><span class="path">${esc(p.path)}</span></div>`).join('')
+  } catch (e) {}
+}
+async function landingNewProject() {
+  document.getElementById('newProjectModal').style.display = 'flex'
+  document.getElementById('newProjectName').focus()
+  const selectedPath = await browseFolder()
+  if (selectedPath) {
+    document.getElementById('newProjectPath').value = selectedPath
+    const defaultName = pathBasename(selectedPath) || '我的小说'
+    if (!document.getElementById('newProjectName').value) document.getElementById('newProjectName').value = defaultName
+  }
+}
+async function landingOpenProject() {
+  document.getElementById('newProjectModal').style.display = 'flex'
+  document.getElementById('newProjectPath').focus()
+  const selectedPath = await browseFolder()
+  if (selectedPath) { document.getElementById('newProjectPath').value = selectedPath; createProject() }
+}
+async function landingOpenRecent(path) {
+  if (!path) return
+  try {
+    const r = await fetch('/api/projects/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) })
+    if (!r.ok) { const e = await r.json(); showToast('打开失败: ' + e.error, 'error'); return }
+    showToast('项目已打开', 'success'); await refreshStatus()
+  } catch (e) { showToast('网络错误', 'error') }
+}
+async function createProject() {
+  const name = document.getElementById('newProjectName').value.trim()
+  const path = document.getElementById('newProjectPath').value.trim()
+  if (!path) return showToast('请输入项目目录路径', 'error')
+  document.getElementById('newProjectModal').style.display = 'none'
+  try {
+    const r = await fetch('/api/projects/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, name: name || undefined }) })
+    if (!r.ok) { const e = await r.json(); showToast('创建失败: ' + e.error, 'error'); return }
+    showToast('项目已创建', 'success'); loadProjects()
+  } catch (e) { showToast('网络错误', 'error') }
+}
+let _browsing = false
+async function browseFolder() {
+  if (_browsing) return ''
+  _browsing = true
+  const btn = document.querySelector('#newProjectModal button[onclick="browseFolder()"]')
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 选择中...' }
+  try {
+    const r = await fetch('/api/dialog/select-folder', { method: 'POST' })
+    const d = await r.json()
+    if (!r.ok) { showToast('打开对话框失败: ' + d.error, 'error'); return '' }
+    if (d.cancelled) return ''
+    document.getElementById('newProjectPath').value = d.path
+    return d.path
+  } catch (e) { showToast('打开对话框失败', 'error'); return '' }
+  finally { _browsing = false; if (btn) { btn.disabled = false; btn.textContent = '📁 浏览...' } }
+}
+
+// ======== Status ========
+async function refreshStatus() {
+  try {
+    const r = await fetch('/api/status'); const s = await r.json()
+    if (s.noProject) {
+      document.getElementById('landing').classList.add('show')
+      document.getElementById('workspace').classList.remove('show')
+      document.getElementById('bottomPanel').style.display = 'none'
+      loadLandingRecent(); return
+    }
+    document.getElementById('landing').classList.remove('show')
+    document.getElementById('workspace').classList.add('show')
+    document.getElementById('bottomPanel').style.display = ''
+    document.getElementById('statusDot').className = 'dot ' + (s.ok && s.llmConfigured ? 'green' : 'red')
+    document.getElementById('statusText').textContent = s.llmConfigured ? `已连接 (${s.model})` : '未配置 LLM'
+    let parts = [`目录: ${pathBasename(s.projectPath)}`]
+    if (s.configItems > 0) parts.push(`⚙️配置(${s.configItems}项)`)
+    if (s.architectureSteps.length > 0) parts.push(`🏗️架构已完成`)
+    if (s.totalPlanned > 0) parts.push(`📋蓝图${s.totalPlanned}章`)
+    if (s.characterCount > 0) parts.push(`👤角色${s.characterCount}人`)
+    if (s.draftCount > 0) parts.push(`✍️草稿${s.draftCount}篇`)
+    if (s.finalizedCount > 0) parts.push(`📖已完成${s.finalizedCount}章`)
+    else if (s.totalPlanned > 0) parts.push(`📖已完成0/${s.totalPlanned}章`)
+    if (parts.length === 1) parts.push('（新项目）')
+    document.getElementById('projectInfo').textContent = parts.join(' | ')
+    loadArchitectDisplay(); loadBlueprints(); loadDraftList(); loadFinalizedList()
+    const active = document.querySelector('.tree-item.active')
+    if (active && active.dataset.type === 'config') showConfigView()
+  } catch (e) { document.getElementById('statusText').textContent = '服务器未连接' }
+}
+function pathBasename(p) { return (p || '').split(/[\\/]/).pop() || p }
+
+// ======== API ========
+async function apiPost(url, body, toastMsg) {
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!r.ok) { const e = await r.json(); appendLog('error', `❌ ${e.error || '请求失败'}`); showToast(e.error || '请求失败', 'error'); return }
+    if (toastMsg) showToast(toastMsg, 'success')
+  } catch (e) { appendLog('error', `❌ 网络错误: ${e.message}`) }
+}
+async function generateConfig() {
+  const idea = document.getElementById('config-idea').value.trim()
+  if (!idea) return showToast('请输入小说灵感', 'error')
+  clearLogs(); appendLog('step', '开始生成配置...')
+  await apiPost('/api/config', { idea, chapters: parseInt(document.getElementById('config-chapters').value) || 100, words: parseInt(document.getElementById('config-words').value) || 3000 }, '配置生成已启动')
+}
+async function generateArchitecture() {
+  const steps = []
+  if (document.getElementById('step-premise').checked) steps.push('premise')
+  if (document.getElementById('step-characters').checked) steps.push('characters')
+  if (document.getElementById('step-world').checked) steps.push('worldbuilding')
+  if (document.getElementById('step-synopsis').checked) steps.push('synopsis')
+  if (!steps.length) return showToast('请至少选择一个步骤', 'error')
+  clearLogs(); appendLog('step', '开始生成故事架构...')
+  let stepGuidance = null
+  try { const raw = document.getElementById('architect-guidance').value.trim(); if (raw) stepGuidance = JSON.parse(raw) }
+  catch (e) { showToast('微操指导 JSON 格式错误', 'error'); return }
+  await apiPost('/api/architect', { steps: steps.join(','), stepGuidance }, '架构生成已启动')
+}
+async function generateBlueprint() {
+  clearLogs(); appendLog('step', '开始生成蓝图...')
+  await apiPost('/api/blueprint', {
+    mode: document.getElementById('bp-mode').value,
+    start: document.getElementById('bp-start').value ? parseInt(document.getElementById('bp-start').value) : undefined,
+    count: document.getElementById('bp-count').value ? parseInt(document.getElementById('bp-count').value) : undefined,
+    pacing: document.getElementById('bp-pacing').value || undefined
+  }, '蓝图生成已启动')
+}
+async function writeChapter() {
+  const ch = parseInt(document.getElementById('write-ch').value)
+  if (!ch) return showToast('请输入章节号', 'error')
+  clearLogs(); appendLog('step', `撰写第${ch}章...`)
+  await apiPost('/api/write', {
+    chapterNumber: ch,
+    title: document.getElementById('write-title').value || undefined,
+    role: document.getElementById('write-role').value || undefined,
+    purpose: document.getElementById('write-purpose').value || undefined,
+    keyEvents: document.getElementById('write-events').value || undefined,
+    characters: document.getElementById('write-chars').value ? document.getElementById('write-chars').value.split(',').map(s => s.trim()) : undefined,
+    suspenseHook: document.getElementById('write-hook').value || undefined,
+    userGuidance: document.getElementById('write-guidance').value || undefined
+  }, `第${ch}章写稿已启动`)
+}
+async function oneClick() {
+  const ch = parseInt(document.getElementById('oc-ch').value)
+  if (!ch) return showToast('请输入章节号', 'error')
+  clearLogs(); appendLog('step', `一键完成 第${ch}章...`)
+  await apiPost('/api/one-click', {
+    chapterNumber: ch,
+    title: document.getElementById('oc-title').value || undefined,
+    role: document.getElementById('oc-role').value || undefined,
+    keyEvents: document.getElementById('oc-events').value || undefined,
+    characters: document.getElementById('oc-chars').value ? document.getElementById('oc-chars').value.split(',').map(s => s.trim()) : undefined,
+    userGuidance: document.getElementById('oc-guidance').value || undefined,
+    focus: document.getElementById('oc-focus').value || undefined
+  }, `第${ch}章 一键完成已启动`)
+}
+// ======== 全部章节一键完成 ========
+function showOneClickAllForm() {
+  showFormPanel(`<div class="card" style="border-color: var(--accent);">
+    <h3>🎯 全部章节一键完成</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">按蓝图顺序，逐章执行：写稿→修稿→审稿→修复→定稿，跳过已定稿章节</p>
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-group"><label>起始章节 (可选)</label><input id="all-start" type="number" min="1" placeholder="第1章"></div>
+      <div class="form-group"><label>截止章节 (可选)</label><input id="all-end" type="number" min="1" placeholder="最后一章"></div>
+      <div class="form-group full"><label>审稿聚焦 (可选)</label><input id="all-focus" placeholder="人设一致性,剧情合理性"></div>
+    </div>
+    <div style="color:var(--text2);font-size:12px;margin-bottom:12px">💡 提示：留空起始/截止则处理所有未定稿章节。可在日志面板查看进度，支持随时终止。</div>
+    <button class="btn btn-green" style="font-size:16px;padding:12px 32px" onclick="oneClickAll()">🎯 开始全部生成</button>
+  </div>`)
+}
+async function oneClickAll() {
+  const start = parseInt(document.getElementById('all-start').value) || undefined
+  const end = parseInt(document.getElementById('all-end').value) || undefined
+  const focus = document.getElementById('all-focus').value || undefined
+  clearLogs(); appendLog('step', '🎯 启动全部章节一键完成...')
+  await apiPost('/api/one-click-all', { startChapter: start, endChapter: end, reviewFocus: focus }, '全部章节批量任务已启动')
+}
+// ======== 导出定稿 ========
+async function exportFinalized() {
+  clearLogs(); appendLog('step', '💾 正在导出所有已定稿章节为 .txt...')
+  try {
+    const r = await fetch('/api/export-finalized', { method: 'POST' })
+    const d = await r.json()
+    if (!r.ok) { showToast(d.error || '导出失败', 'error'); appendLog('error', '❌ ' + (d.error || '导出失败')); return }
+    appendLog('done', `✅ ${d.message}`)
+    showToast(d.message, 'success')
+  } catch (e) { appendLog('error', '❌ 导出请求失败'); showToast('导出请求失败', 'error') }
+}
+async function saveSettings() {
+  const body = {
     baseUrl: document.getElementById('settings-baseUrl').value.trim(),
     apiKey: document.getElementById('settings-apiKey').value.trim(),
     model: document.getElementById('settings-model').value.trim(),
-    wordsPerChapter: parseInt(document.getElementById('settings-wordsPerChapter').value)||3000,
-    totalChapters: parseInt(document.getElementById('settings-totalChapters').value)||100,
+    wordsPerChapter: parseInt(document.getElementById('settings-wordsPerChapter').value) || 3000,
+    totalChapters: parseInt(document.getElementById('settings-totalChapters').value) || 100,
   }
-  try{
-    const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    if(!r.ok){ const e=await r.json(); showToast('保存失败: '+e.error,'error'); return }
-    document.getElementById('settingsStatus').textContent='✅ 已保存'
-    showToast('设置已保存','success')
-    refreshStatus()
-    setTimeout(()=>document.getElementById('settingsStatus').textContent='',2000)
-  }catch(e){ showToast('网络错误','error') }
+  try {
+    const r = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!r.ok) { const e = await r.json(); showToast('保存失败: ' + e.error, 'error'); return }
+    const st = document.getElementById('settingsStatus'); if (st) st.textContent = '✅ 已保存'
+    showToast('设置已保存', 'success'); refreshStatus()
+    setTimeout(() => { const el = document.getElementById('settingsStatus'); if (el) el.textContent = '' }, 2000)
+  } catch (e) { showToast('网络错误', 'error') }
 }
 
-function toggleApiKey(){ const el=document.getElementById('settings-apiKey'); el.type=el.type==='password'?'text':'password' }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 
-// === API ===
-async function apiPost(url,body,toastMsg){
-  try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    if(!r.ok){ const e=await r.json(); appendLog('error',`❌ ${e.error||'请求失败'}`); showToast(e.error||'请求失败','error'); return }
-    if(toastMsg) showToast(toastMsg,'success')
-  }catch(e){ appendLog('error',`❌ 网络错误: ${e.message}`) }
+// ======== Bottom Panel ========
+function toggleBottomPanel() {
+  const panel = document.getElementById('bottomPanel')
+  const toggle = panel.querySelector('.bottom-toggle')
+  const mainContent = document.querySelector('.main-content')
+  if (panel.classList.contains('collapsed')) {
+    panel.classList.remove('collapsed')
+    toggle.textContent = '▲'; mainContent.style.paddingBottom = '324px'
+  } else {
+    panel.classList.add('collapsed')
+    toggle.textContent = '▼'; mainContent.style.paddingBottom = '36px'
+  }
 }
 
-async function generateConfig(){
-  const idea=document.getElementById('config-idea').value.trim()
-  if(!idea) return showToast('请输入小说灵感','error')
-  clearLogs(); appendLog('step','开始生成配置...')
-  await apiPost('/api/config',{idea,chapters:parseInt(document.getElementById('config-chapters').value)||100,words:parseInt(document.getElementById('config-words').value)||3000},'配置生成已启动')
-}
-
-async function generateArchitecture(){
-  const steps=[]
-  if(document.getElementById('step-premise').checked) steps.push('premise')
-  if(document.getElementById('step-characters').checked) steps.push('characters')
-  if(document.getElementById('step-world').checked) steps.push('worldbuilding')
-  if(document.getElementById('step-synopsis').checked) steps.push('synopsis')
-  if(!steps.length) return showToast('请至少选择一个步骤','error')
-  clearLogs(); appendLog('step','开始生成故事架构...')
-  let stepGuidance=null
-  try{ const raw=document.getElementById('architect-guidance').value.trim(); if(raw) stepGuidance=JSON.parse(raw) }
-  catch(e){ showToast('微操指导 JSON 格式错误','error'); return }
-  await apiPost('/api/architect',{steps:steps.join(','),stepGuidance},'架构生成已启动')
-}
-
-async function generateBlueprint(){
-  const mode=document.getElementById('bp-mode').value
-  const start=document.getElementById('bp-start').value
-  const count=document.getElementById('bp-count').value
-  const pacing=document.getElementById('bp-pacing').value
-  clearLogs(); appendLog('step','开始生成蓝图...')
-  await apiPost('/api/blueprint',{mode,start:start?parseInt(start):undefined,count:count?parseInt(count):undefined,pacing:pacing||undefined},'蓝图生成已启动')
-}
-
-async function loadBlueprints(){
-  try{
-    const r=await fetch('/api/blueprints'); const bps=await r.json()
-    document.getElementById('bp-total').textContent=`(${bps.length} 章)`
-    const list=document.getElementById('bp-list')
-    if(!bps.length){ list.innerHTML='<span style="color:var(--text2)">暂无蓝图</span>'; return }
-    list.innerHTML=bps.map(b=>`<div class="bp-item" onclick="fillFromBlueprint(${b.chapterNumber})"><span class="num">第${b.chapterNumber}章</span><span class="title">${esc(b.title)}</span><span class="role">${esc(b.role)}</span></div>`).join('')
-    // 已有蓝图时自动切到追加模式，预填下一章
-    const maxCh=Math.max(...bps.map(b=>b.chapterNumber))
-    document.getElementById('bp-mode').value='append'
-    document.getElementById('bp-start').placeholder=`默认 ${maxCh+1}`
-  }catch(e){}
-}
-
-function fillFromBlueprint(ch){ document.getElementById('write-ch').value=ch; document.querySelector('[data-panel="write"]').click() }
-
-async function writeChapter(){
-  const ch=parseInt(document.getElementById('write-ch').value)
-  if(!ch) return showToast('请输入章节号','error')
-  clearLogs(); appendLog('step',`撰写第${ch}章...`)
-  await apiPost('/api/write',{
-    chapterNumber:ch,
-    title:document.getElementById('write-title').value||undefined,
-    role:document.getElementById('write-role').value||undefined,
-    purpose:document.getElementById('write-purpose').value||undefined,
-    keyEvents:document.getElementById('write-events').value||undefined,
-    characters:document.getElementById('write-chars').value?document.getElementById('write-chars').value.split(',').map(s=>s.trim()):undefined,
-    suspenseHook:document.getElementById('write-hook').value||undefined,
-    userGuidance:document.getElementById('write-guidance').value||undefined
-  },`第${ch}章写稿已启动`)
-}
-
-function oneClickFromWrite(){
-  const ch=parseInt(document.getElementById('write-ch').value)
-  if(!ch) return showToast('请先输入章节号','error')
-  document.getElementById('oc-ch').value=ch
-  document.getElementById('oc-title').value=document.getElementById('write-title').value
-  document.getElementById('oc-role').value=document.getElementById('write-role').value
-  document.getElementById('oc-events').value=document.getElementById('write-events').value
-  document.getElementById('oc-chars').value=document.getElementById('write-chars').value
-  document.getElementById('oc-guidance').value=document.getElementById('write-guidance').value
-  document.querySelector('[data-panel="oneclick"]').click()
-}
-
-async function oneClick(){
-  const ch=parseInt(document.getElementById('oc-ch').value)
-  if(!ch) return showToast('请输入章节号','error')
-  clearLogs(); appendLog('step',`一键完成 第${ch}章...`)
-  await apiPost('/api/one-click',{
-    chapterNumber:ch,
-    title:document.getElementById('oc-title').value||undefined,
-    role:document.getElementById('oc-role').value||undefined,
-    keyEvents:document.getElementById('oc-events').value||undefined,
-    characters:document.getElementById('oc-chars').value?document.getElementById('oc-chars').value.split(',').map(s=>s.trim()):undefined,
-    userGuidance:document.getElementById('oc-guidance').value||undefined,
-    focus:document.getElementById('oc-focus').value||undefined
-  },`第${ch}章 一键完成已启动`)
-}
-
-async function refineChapter(){
-  const ch=parseInt(document.getElementById('post-ch').value)
-  if(!ch) return showToast('请输入章节号','error')
-  clearLogs(); appendLog('step',`修稿 第${ch}章...`)
-  await apiPost('/api/refine',{chapterNumber:ch},`第${ch}章修稿已启动`)
-}
-
-async function reviewChapter(){
-  const ch=parseInt(document.getElementById('post-ch').value)
-  if(!ch) return showToast('请输入章节号','error')
-  clearLogs(); appendLog('step',`审稿 第${ch}章...`)
-  await apiPost('/api/review',{chapterNumber:ch},`第${ch}章审稿已启动`)
-}
-
-async function finalizeChapter(){
-  const ch=parseInt(document.getElementById('post-ch').value)
-  if(!ch) return showToast('请输入章节号','error')
-  clearLogs(); appendLog('step',`定稿 第${ch}章...`)
-  await apiPost('/api/finalize',{chapterNumber:ch,title:document.getElementById('post-title').value||undefined},`第${ch}章定稿已启动`)
-}
-
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
 refreshStatus()
 </script>
 </body>

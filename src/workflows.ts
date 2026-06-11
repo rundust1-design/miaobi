@@ -50,7 +50,15 @@ export async function executeWorkflow(
   context.data ??= {}
   context.data.autoMode = true
 
+  const signal = context.data?.abortSignal as AbortSignal | undefined
+
   for (let i = 0; i < steps.length; i++) {
+    // 检查是否已被中止
+    if (signal?.aborted) {
+      callbacks.log('🛑 操作已取消')
+      throw new Error('操作已由用户取消')
+    }
+
     const step = steps[i]
     callbacks.onStepStart?.(step.name, i, steps.length)
     callbacks.log(`\n--- 步骤 ${i + 1}/${steps.length}: ${step.name} ---`)
