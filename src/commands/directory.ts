@@ -23,8 +23,39 @@ export class GenerateDirectoryCommand extends BaseCommand<Blueprint[]> {
       throw new Error('项目架构不完整，请先运行 "miaobi architect"')
     }
 
-    const genre = getConfigValue('genre') || '玄幻'
+    // 必须有完整情节大纲（覆盖全书章节）才能生成蓝图
     const totalChapters = parseInt(getConfigValue('total_chapters') || '100')
+    const synopsis = getProjectCore('synopsis')
+
+    if (!synopsis || synopsis.trim().length < 100) {
+      throw new Error(
+        '请先生成完整的情节大纲（synopsis），再生成蓝图。\n' +
+        '当前情节大纲缺失或内容过短，AI 无法规划合理的章节结构。'
+      )
+    }
+
+    // 从大纲中提取所有章号，检测是否覆盖全书
+    const chapterNumbers = extractChapterNumbers(synopsis)
+    const maxChapterInSynopsis = chapterNumbers.length > 0 ? Math.max(...chapterNumbers) : 0
+
+    if (maxChapterInSynopsis < totalChapters * 0.8) {
+      throw new Error(
+        `情节大纲未覆盖全书！\n` +
+        `- 设定总章数：${totalChapters} 章\n` +
+        `- 大纲中提及的最大章号：${maxChapterInSynopsis || '未检测到'}\n` +
+        `- 检测到的章号数量：${chapterNumbers.length} 个\n\n` +
+        `请重新生成情节大纲，确保大纲涵盖了全 ${totalChapters} 章的故事结构。`
+      )
+    }
+
+    if (chapterNumbers.length < 3) {
+      throw new Error(
+        `情节大纲过于简略，仅检测到 ${chapterNumbers.length} 个章节引用。\n` +
+        `请重新生成情节大纲，确保包含至少 3 个以上的结构节点（如：开局、发展、高潮、结局等）。`
+      )
+    }
+
+    const genre = getConfigValue('genre') || '玄幻'
     const globalGuidance = getConfigValue('global_guidance') || ''
 
     if (this.mode === 'full') {
@@ -298,4 +329,43 @@ function extractBlueprintsByRegex(rawText: string, startNum: number, endNum: num
   }
 
   return results.sort((a, b) => a.chapterNumber - b.chapterNumber)
+}
+
+/**
+ * 从情节大纲文本中提取所有章号引用。
+ * 支持格式：「第1-10章」「第5章」「第20章~第30章」「1-5章」「第100章」
+ */
+function extractChapterNumbers(text: string): number[] {
+  const numbers = new Set<number>()
+
+  // 匹配「第X-Y章」「第X～Y章」「第X—Y章」等范围表达
+  const rangeRegex = /第\s*(\d+)\s*[-–—～~到至]\s*(?:第\s*)?(\d+)\s*章/g
+  let match: RegExpExecArray | null
+  while ((match = rangeRegex.exec(text)) !== null) {
+    const from = parseInt(match[1])
+    const to = parseInt(match[2])
+    // 合理范围：不超过 10000 章
+    if (from > 0 && to > from && to <= 10000) {
+      for (let i = from; i <= to; i++) numbers.add(i)
+    }
+  }
+
+  // 匹配「第X章」（单独出现，不在已匹配范围内）
+  const singleRegex = /第\s*(\d+)\s*章/g
+  while ((match = singleRegex.exec(text)) !== null) {
+    const n = parseInt(match[1])
+    if (n > 0 && n <= 10000) numbers.add(n)
+  }
+
+  // 匹配「X-Y章」（前面没有"第"的格式，如「1-10章 开端」）
+  const bareRangeRegex = /(?:^|[\s,，、])(\d{1,4})\s*[-–—～~][-–—～~]?\s*(\d{1,4})\s*章/g
+  while ((match = bareRangeRegex.exec(text)) !== null) {
+    const from = parseInt(match[1])
+    const to = parseInt(match[2])
+    if (from > 0 && to > from && to <= 10000) {
+      for (let i = from; i <= to; i++) numbers.add(i)
+    }
+  }
+
+  return [...numbers].sort((a, b) => a - b)
 }

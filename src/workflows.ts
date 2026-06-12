@@ -18,6 +18,7 @@ import { RefineFromReviewCommand } from './commands/refine-from-review.js'
 import { FinalizeChapterCommand } from './commands/finalize-chapter.js'
 import {
   getLatestDraft, getPendingRevisions, markRevisionMerged,
+  getDraftStatus, hasReview,
   updateDraftContent, getBlueprint, getAllBlueprints,
 } from './database.js'
 
@@ -236,41 +237,75 @@ export function createOneClickCompleteWorkflow(
   chapterInfo: { chapterNumber: number; title: string; role: string; purpose: string; characters: string[]; keyEvents: string; suspenseHook?: string; userGuidance?: string },
   reviewFocus?: string,
 ): WorkflowDefinition {
-  return {
-    type: 'one-click-complete',
-    steps: [
-      // Step 1: 写草稿
-      {
-        name: 'AI 写稿',
-        command: new GenerateDraftCommand(chapterInfo),
-      },
-      // Step 2: AI 修稿
-      {
-        name: 'AI 修稿',
-        command: new RefineDraftCommand(chapterInfo.chapterNumber),
-      },
-      // Step 3: 一致性审稿
-      {
-        name: '一致性审稿',
-        command: new ReviewChapterCommand(chapterInfo.chapterNumber, reviewFocus),
-      },
-      // Step 4: 审稿修复
-      {
-        name: '审稿修复',
-        command: new RefineFromReviewCommand(chapterInfo.chapterNumber),
-      },
-      // Step 5: 定稿
-      {
-        name: '定稿',
-        command: new FinalizeChapterCommand({
-          draftPath: '',
-          draftContent: '',
-          chapterNumber: chapterInfo.chapterNumber,
-          chapterTitle: chapterInfo.title,
-        }),
-      },
-    ],
+  const cn = chapterInfo.chapterNumber
+  const steps: WorkflowStep[] = []
+
+  // 续传：根据章节当前状态决定从哪一步开始
+  const status = getDraftStatus(cn)
+  const latestDraft = getLatestDraft(cn)
+  const reviewed = latestDraft ? hasReview(latestDraft.id) : false
+  const skippedSteps: string[] = []
+
+  if (status === 'none' || !latestDraft) {
+    // 无草稿 → 完整流程
+    skippedSteps.push('无已有草稿，从写稿开始')
+  } else if (reviewed) {
+    // 已有审稿 → 跳过写稿和修稿，从审稿修复开始
+    skippedSteps.push('已有审稿，跳过写稿和修稿')
+    skippedSteps.push('已有审稿，跳过写稿和修稿')
+  } else {
+    // 有草稿但未审稿 → 跳过写稿，从修稿开始
+    skippedSteps.push('已有草稿，跳过写稿')
   }
+
+  // Step 1: 写草稿（仅无草稿时执行）
+  if (status === 'none' || !latestDraft) {
+    steps.push({
+      name: 'AI 写稿',
+      command: new GenerateDraftCommand(chapterInfo),
+    })
+  }
+
+  // Step 2: AI 修稿（已有审稿时跳过）
+  if (!reviewed) {
+    steps.push({
+      name: 'AI 修稿',
+      command: new RefineDraftCommand(cn),
+    })
+  }
+
+  // Step 3: 一致性审稿
+  steps.push({
+    name: '一致性审稿',
+    command: new ReviewChapterCommand(cn, reviewFocus),
+  })
+
+  // Step 4: 审稿修复
+  steps.push({
+    name: '审稿修复',
+    command: new RefineFromReviewCommand(cn),
+  })
+
+  // Step 5: 定稿
+  steps.push({
+    name: '定稿',
+    command: new FinalizeChapterCommand({
+      draftPath: '',
+      draftContent: '',
+      chapterNumber: cn,
+      chapterTitle: chapterInfo.title,
+    }),
+  })
+
+  // 将有跳过步骤的信息注入 context
+  const wrappedSteps = steps.map((step, i) => ({
+    ...step,
+    name: i === 0 && skippedSteps.length > 0
+      ? `${step.name}（续传: ${skippedSteps.join('; ')}）`
+      : step.name,
+  }))
+
+  return { type: 'one-click-complete', steps: wrappedSteps }
 }
 
 /**

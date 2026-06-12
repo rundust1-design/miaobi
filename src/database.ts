@@ -511,6 +511,89 @@ export function getPreviousChapterEnding(currentChapter: number): string {
   return prevDraft.content.slice(-1000)
 }
 
+// ===== 项目阶段检测 =====
+
+export type ProjectPhase = 'init' | 'config' | 'architecture' | 'blueprint' | 'writing'
+
+/** 获取当前项目所处的阶段 */
+export function getProjectPhase(): ProjectPhase {
+  const d = getDb()
+
+  // 检查是否有草稿 → writing
+  const draftCount = d.prepare('SELECT COUNT(*) as cnt FROM drafts').get() as { cnt: number }
+  if (draftCount.cnt > 0) return 'writing'
+
+  // 检查是否有蓝图 → blueprint
+  const bpCount = d.prepare('SELECT COUNT(*) as cnt FROM blueprints').get() as { cnt: number }
+  if (bpCount.cnt > 0) return 'blueprint'
+
+  // 检查是否有故事架构数据 → architecture
+  const coreCount = d.prepare("SELECT COUNT(*) as cnt FROM project_core WHERE content IS NOT NULL AND content != ''").get() as { cnt: number }
+  if (coreCount.cnt > 0) return 'architecture'
+
+  // 检查是否有小说配置 → config
+  const cfgCount = d.prepare('SELECT COUNT(*) as cnt FROM novel_config').get() as { cnt: number }
+  if (cfgCount.cnt > 0) return 'config'
+
+  return 'init'
+}
+
+const ARCHITECTURE_STEPS = ['premise', 'characters', 'worldbuilding', 'synopsis']
+
+/** 获取已完成的架构步骤（project_core 中有非空内容的步骤） */
+export function getCompletedArchitectureSteps(): string[] {
+  const d = getDb()
+  const rows = d.prepare(
+    "SELECT key FROM project_core WHERE content IS NOT NULL AND content != ''"
+  ).all() as Array<{ key: string }>
+  return rows.map(r => r.key).filter(k => ARCHITECTURE_STEPS.includes(k))
+}
+
+/** 章节状态 */
+export type DraftStatus = 'none' | 'draft' | 'finalized'
+
+/** 获取某章的当前状态 */
+export function getDraftStatus(chapterNumber: number): DraftStatus {
+  const d = getDb()
+  const row = d.prepare(
+    `SELECT status FROM drafts WHERE chapter_number = ?
+     ORDER BY version DESC LIMIT 1`
+  ).get(chapterNumber) as { status: string } | undefined
+  if (!row) return 'none'
+  if (row.status === 'finalized') return 'finalized'
+  return 'draft'
+}
+
+/** 是否存在任何草稿 */
+export function hasAnyDraft(): boolean {
+  const d = getDb()
+  const row = d.prepare('SELECT COUNT(*) as cnt FROM drafts').get() as { cnt: number }
+  return row.cnt > 0
+}
+
+/** 是否存在任何蓝图 */
+export function hasAnyBlueprint(): boolean {
+  const d = getDb()
+  const row = d.prepare('SELECT COUNT(*) as cnt FROM blueprints').get() as { cnt: number }
+  return row.cnt > 0
+}
+
+/** 是否存在故事架构数据 */
+export function hasArchitecture(): boolean {
+  const d = getDb()
+  const row = d.prepare(
+    "SELECT COUNT(*) as cnt FROM project_core WHERE content IS NOT NULL AND content != ''"
+  ).get() as { cnt: number }
+  return row.cnt > 0
+}
+
+/** 获取某章的最新 review */
+export function hasReview(draftId: number): boolean {
+  const d = getDb()
+  const row = d.prepare('SELECT COUNT(*) as cnt FROM reviews WHERE draft_id = ?').get(draftId) as { cnt: number }
+  return row.cnt > 0
+}
+
 export function closeDb(): void {
   if (db) {
     db.close()

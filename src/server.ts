@@ -10,10 +10,10 @@ import { Server as SocketIOServer } from 'socket.io'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { execSync } from 'node:child_process'
 
 import { getConfig, updateConfig, validateConfig, listProjects, registerProject, switchProject as switchCfg, requireProjectSelection } from './config.js'
-import { getDb, closeDb, getBlueprint, getLatestDraft, getDraftByChapterAndVersion, getFinalizedDraft, getAllBlueprints, getAllProjectCore, getAllCharacters, getAllConfig, getConfigValue, getAllDraftsSummary, getAllFinalizedSummary } from './database.js'
+import { migrateFromLegacy, setProjectConfigs, getAllProjectConfig, getWorkspaceDir, setWorkspaceDir, projectPathFromName } from './global-db.js'
+import { getDb, closeDb, getBlueprint, getLatestDraft, getDraftByChapterAndVersion, getFinalizedDraft, getAllBlueprints, getAllProjectCore, getAllCharacters, getAllConfig, getConfigValue, getAllDraftsSummary, getAllFinalizedSummary, getProjectPhase, getCompletedArchitectureSteps, getDraftStatus, hasAnyDraft, hasAnyBlueprint, hasArchitecture, hasReview } from './database.js'
 import {
   executeWorkflow,
   createConfigWorkflow, createArchitectureWorkflow, createDirectoryWorkflow,
@@ -136,11 +136,14 @@ app.get('/api/status', (_req, res) => {
     const blueprints = getAllBlueprints()
     const core = getAllProjectCore()
     const chars = getAllCharacters()
+    const phase = getProjectPhase()
 
     // 检查 novel_config 是否有数据（项目配置是否已生成）
     const configKeys = db.prepare('SELECT COUNT(*) as cnt FROM novel_config').get() as { cnt: number }
     const draftCount = (db.prepare('SELECT COUNT(*) as cnt FROM drafts').get() as { cnt: number }).cnt
     const finalizedCount = (db.prepare("SELECT COUNT(*) as cnt FROM drafts WHERE status = 'finalized'").get() as { cnt: number }).cnt
+    const finalizedChapters = (db.prepare("SELECT chapter_number FROM drafts WHERE status = 'finalized'").all() as Array<{ chapter_number: number }>).map(r => r.chapter_number)
+    const draftChapters = (db.prepare("SELECT DISTINCT chapter_number FROM drafts").all() as Array<{ chapter_number: number }>).map(r => r.chapter_number)
 
     res.json({
       ok: true,
@@ -155,6 +158,9 @@ app.get('/api/status', (_req, res) => {
       configItems: configKeys.cnt,
       draftCount,
       totalChapters: cfg.writing.totalChapters,
+      phase,
+      finalizedChapterNumbers: finalizedChapters,
+      draftChapterNumbers: draftChapters,
     })
   } catch (e) {
     res.json({ ok: false, error: String(e) })
@@ -174,11 +180,12 @@ app.get('/api/settings', (_req, res) => {
     wordsPerChapter: cfg.writing.wordsPerChapter,
     totalChapters: cfg.writing.totalChapters,
     projectPath: cfg.projectPath,
+    workspaceDir: getWorkspaceDir(),
   })
 })
 
 app.post('/api/settings', (req, res) => {
-  const { baseUrl, apiKey, model, embeddingBaseUrl, embeddingApiKey, embeddingModel, wordsPerChapter, totalChapters } = req.body
+  const { baseUrl, apiKey, model, embeddingBaseUrl, embeddingApiKey, embeddingModel, wordsPerChapter, totalChapters, workspaceDir } = req.body
   updateConfig({
     baseUrl: baseUrl?.trim?.(),
     apiKey: apiKey?.trim?.(),
@@ -189,6 +196,10 @@ app.post('/api/settings', (req, res) => {
     wordsPerChapter: wordsPerChapter ? parseInt(String(wordsPerChapter)) : undefined,
     totalChapters: totalChapters ? parseInt(String(totalChapters)) : undefined,
   })
+  // 工作区目录独立保存（全局设置，不绑定项目）
+  if (workspaceDir?.trim) {
+    setWorkspaceDir(resolve(workspaceDir.trim()))
+  }
   res.json({ ok: true })
 })
 
@@ -221,51 +232,59 @@ app.post('/api/projects/switch', (req, res) => {
 
 app.post('/api/projects/create', (req, res) => {
   const { path, name } = req.body
-  if (!path) return res.status(400).json({ error: '缺少 path' })
+  // 如果有 name 但没有 path，根据工作区自动生成路径
+  const projectPath = path ? resolve(path) :
+    name ? projectPathFromName(name) : null
+  if (!projectPath) return res.status(400).json({ error: '缺少项目名称或路径' })
+
+  // 检测同名项目
+  const projectName = name || projectPath.split('/').pop() || '未命名'
+  const existing = listProjects().find(
+    p => p.name === projectName || p.path === projectPath
+  )
+  if (existing) {
+    return res.status(409).json({ error: `项目"${projectName}"已存在（路径: ${existing.path}）` })
+  }
 
   try {
-    const projectPath = resolve(path)
     const miaobiDir = join(projectPath, '.miaobi')
     mkdirSync(miaobiDir, { recursive: true })
 
-    // 创建 .env：继承已有项目的 LLM 配置
-    const envPath = join(projectPath, '.env')
-    if (!existsSync(envPath)) {
-      let baseUrl = '', apiKey = '', model = '', wordsPer = '3000', totalChap = '100'
-      const currentCfg = getConfig()
-      if (currentCfg.llm.apiKey) {
-        baseUrl = currentCfg.llm.baseUrl
-        apiKey = currentCfg.llm.apiKey
-        model = currentCfg.llm.model
-        wordsPer = String(currentCfg.writing.wordsPerChapter)
-        totalChap = String(currentCfg.writing.totalChapters)
-      } else {
-        // 未选项目时，从注册表中查找已有项目的 .env 继承
-        for (const proj of listProjects()) {
-          const inheritEnv = join(proj.path, '.env')
-          if (existsSync(inheritEnv)) {
-            const content = readFileSync(inheritEnv, 'utf-8')
-            const m = (k: string) => (content.match(new RegExp('^' + k + '=(.+)', 'm')) || [])[1] || ''
-            baseUrl = m('LLM_BASE_URL') || 'https://api.openai.com/v1'
-            apiKey = m('LLM_API_KEY') || ''
-            model = m('LLM_MODEL') || 'gpt-4o'
-            wordsPer = m('DEFAULT_WORDS_PER_CHAPTER') || '3000'
-            totalChap = m('DEFAULT_TOTAL_CHAPTERS') || '100'
-            break
-          }
+    // 继承已有项目的 LLM 配置（从全局 DB）
+    let defaults: Record<string, string> = {
+      'LLM_BASE_URL': 'https://api.openai.com/v1',
+      'LLM_API_KEY': '',
+      'LLM_MODEL': 'gpt-4o',
+      'DEFAULT_WORDS_PER_CHAPTER': '3000',
+      'DEFAULT_TOTAL_CHAPTERS': '100',
+      'EMBEDDING_BASE_URL': 'https://api.openai.com/v1',
+      'EMBEDDING_API_KEY': '',
+      'EMBEDDING_MODEL': 'text-embedding-3-small',
+    }
+
+    const currentCfg = getConfig()
+    if (currentCfg.llm.apiKey) {
+      defaults['LLM_BASE_URL'] = currentCfg.llm.baseUrl
+      defaults['LLM_API_KEY'] = currentCfg.llm.apiKey
+      defaults['LLM_MODEL'] = currentCfg.llm.model
+      defaults['EMBEDDING_BASE_URL'] = currentCfg.llm.embedding.baseUrl
+      defaults['EMBEDDING_API_KEY'] = currentCfg.llm.embedding.apiKey
+      defaults['EMBEDDING_MODEL'] = currentCfg.llm.embedding.model
+      defaults['DEFAULT_WORDS_PER_CHAPTER'] = String(currentCfg.writing.wordsPerChapter)
+      defaults['DEFAULT_TOTAL_CHAPTERS'] = String(currentCfg.writing.totalChapters)
+    } else {
+      // 未选项目时，从全局 DB 查找已有项目的配置继承
+      for (const proj of listProjects()) {
+        const existingConfig = getAllProjectConfig(proj.path)
+        if (existingConfig['LLM_API_KEY']) {
+          defaults = { ...defaults, ...existingConfig }
+          break
         }
       }
-      const envContent = '# 妙笔配置\n' +
-        'LLM_BASE_URL=' + baseUrl + '\n' +
-        'LLM_API_KEY=' + apiKey + '\n' +
-        'LLM_MODEL=' + model + '\n\n' +
-        '# 写作默认值\n' +
-        'DEFAULT_WORDS_PER_CHAPTER=' + wordsPer + '\n' +
-        'DEFAULT_TOTAL_CHAPTERS=' + totalChap + '\n\n' +
-        '# 妙笔目录\n' +
-        'MIAOBI_HOME=' + miaobiDir + '\n'
-      writeFileSync(envPath, envContent, 'utf-8')
     }
+
+    // 写入全局数据库（不再创建 .env 文件）
+    setProjectConfigs(projectPath, defaults)
 
     // 注册到全局列表
     registerProject(projectPath, name)
@@ -277,42 +296,6 @@ app.post('/api/projects/create', (req, res) => {
     res.json({ ok: true, currentPath: projectPath })
   } catch (e) {
     res.status(500).json({ error: String(e) })
-  }
-})
-
-// ===== 原生文件夹选择对话框 =====
-app.post('/api/dialog/select-folder', (_req, res) => {
-  try {
-    // 写临时 PowerShell 脚本（UTF-16 LE + BOM = PowerShell 原生编码）
-    const scriptPath = join(__dirname, '.folder-dialog.ps1')
-    const scriptLines = [
-      'Add-Type -AssemblyName System.Windows.Forms',
-      '$f = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{',
-      "  Description = '选择小说项目文件夹'",
-      '  ShowNewFolderButton = $true',
-      "  RootFolder = 'MyComputer'",
-      '}',
-      "if ($f.ShowDialog() -eq 'OK') { Write-Output $f.SelectedPath }",
-      '',
-    ]
-    writeFileSync(scriptPath, '﻿' + scriptLines.join('\r\n'), 'utf-8')
-    // PowerShell 在中文 Windows 上默认输出 CP936 (GBK)，用 -Command 强制 UTF-8 输出
-    const psCmd = `[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; & '${scriptPath.replace(/'/g, "''")}'`
-    const result = execSync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCmd}"`,
-      { encoding: 'utf8', timeout: 120000 },
-    )
-    // 清理临时文件
-    try { require('fs').unlinkSync(scriptPath) } catch {}
-    const selectedPath = result.trim()
-    if (selectedPath) {
-      res.json({ ok: true, path: selectedPath })
-    } else {
-      res.json({ ok: false, cancelled: true })
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    res.status(500).json({ error: msg })
   }
 })
 
@@ -343,11 +326,27 @@ app.post('/api/config', async (req, res) => {
 
 // ===== 架构生成 =====
 app.post('/api/architect', async (req, res) => {
+  // 守卫：已进入蓝图阶段或之后，锁定架构
+  const phase = getProjectPhase()
+  if (phase === 'blueprint' || phase === 'writing') {
+    return res.status(423).json({ error: '故事架构已锁定。生成蓝图后不可修改架构。', phase })
+  }
+
   const { steps, stepGuidance } = req.body
-  const selectedSteps = (steps || 'premise,characters,worldbuilding,synopsis').split(',').map((s: string) => s.trim())
+  const requestedSteps = (steps || 'premise,characters,worldbuilding,synopsis').split(',').map((s: string) => s.trim())
+
+  // 续传：排除已完成的步骤
+  const completed = getCompletedArchitectureSteps()
+  const selectedSteps = requestedSteps.filter((s: string) => !completed.includes(s))
+
+  if (selectedSteps.length === 0) {
+    return res.json({ ok: true, skipped: true, message: `架构已全部完成（已完成: ${completed.join(', ')}）` })
+  }
+
+  io.emit('log', { type: 'log', message: `📝 架构生成：已完成 ${completed.length} 步，剩余 ${selectedSteps.length} 步: ${selectedSteps.join(', ')}` })
 
   const workflow = createArchitectureWorkflow(selectedSteps)
-  res.json({ started: true })
+  res.json({ started: true, completed, selected: selectedSteps })
   withAbortContext(
     signal => executeWorkflow(workflow, { data: { stepGuidance } }, createLogCallbacks(signal)),
     '架构生成完成',
@@ -369,6 +368,11 @@ app.post('/api/extract-characters', async (_req, res) => {
 
 // ===== 蓝图生成 =====
 app.post('/api/blueprint', async (req, res) => {
+  // 守卫：已进入写稿阶段，锁定蓝图
+  if (hasAnyDraft()) {
+    return res.status(423).json({ error: '章节蓝图已锁定。开始写稿后不可修改蓝图。', phase: 'writing' })
+  }
+
   let { mode, start, count, pacing } = req.body
   mode = mode || 'full'
 
@@ -421,6 +425,12 @@ app.post('/api/write', async (req, res) => {
   const { chapterNumber, title, role, purpose, keyEvents, characters, suspenseHook, userGuidance } = req.body
   if (!chapterNumber) return res.status(400).json({ error: '缺少 chapterNumber' })
 
+  // 守卫：该章已定稿则锁定
+  const status = getDraftStatus(chapterNumber)
+  if (status === 'finalized') {
+    return res.status(423).json({ error: `第${chapterNumber}章已定稿，不可重新写稿。`, chapterNumber })
+  }
+
   const bp = getBlueprint(chapterNumber)
   const chapterInfo = {
     chapterNumber,
@@ -446,6 +456,12 @@ app.post('/api/refine', async (req, res) => {
   const { chapterNumber } = req.body
   if (!chapterNumber) return res.status(400).json({ error: '缺少 chapterNumber' })
 
+  // 守卫：该章已定稿则锁定
+  const status = getDraftStatus(chapterNumber)
+  if (status === 'finalized') {
+    return res.status(423).json({ error: `第${chapterNumber}章已定稿，不可重新修稿。`, chapterNumber })
+  }
+
   const workflow = createRefineWorkflow(chapterNumber)
   res.json({ started: true })
   withAbortContext(
@@ -459,6 +475,12 @@ app.post('/api/review', async (req, res) => {
   const { chapterNumber, focus } = req.body
   if (!chapterNumber) return res.status(400).json({ error: '缺少 chapterNumber' })
 
+  // 守卫：该章已定稿则锁定
+  const status = getDraftStatus(chapterNumber)
+  if (status === 'finalized') {
+    return res.status(423).json({ error: `第${chapterNumber}章已定稿，不可重新审稿。`, chapterNumber })
+  }
+
   const workflow = createReviewWorkflow(chapterNumber, focus)
   res.json({ started: true })
   withAbortContext(
@@ -471,6 +493,11 @@ app.post('/api/review', async (req, res) => {
 app.post('/api/finalize', async (req, res) => {
   const { chapterNumber, title } = req.body
   if (!chapterNumber) return res.status(400).json({ error: '缺少 chapterNumber' })
+
+  // 守卫：该章已定稿则跳过
+  if (getDraftStatus(chapterNumber) === 'finalized') {
+    return res.status(423).json({ error: `第${chapterNumber}章已经定稿，不可重复定稿。`, chapterNumber })
+  }
 
   const draft = getLatestDraft(chapterNumber)
   const bp = getBlueprint(chapterNumber)
@@ -493,6 +520,11 @@ app.post('/api/finalize', async (req, res) => {
 app.post('/api/one-click', async (req, res) => {
   const { chapterNumber, title, role, purpose, keyEvents, characters, suspenseHook, userGuidance, focus } = req.body
   if (!chapterNumber) return res.status(400).json({ error: '缺少 chapterNumber' })
+
+  // 守卫：该章已定稿则锁定
+  if (getDraftStatus(chapterNumber) === 'finalized') {
+    return res.status(423).json({ error: `第${chapterNumber}章已定稿，请勿重复操作。`, chapterNumber })
+  }
 
   const bp = getBlueprint(chapterNumber)
   const chapterInfo = {
@@ -739,6 +771,12 @@ app.post('/api/export-finalized', async (req, res) => {
     const finalized = getAllFinalizedSummary()
     if (finalized.length === 0) return res.json({ ok: true, count: 0, message: '没有已定稿的章节' })
 
+    // 导出目标：工作区目录/项目名/
+    const wsDir = getWorkspaceDir()
+    const projectName = cfg.projectPath.split('/').pop() || '未命名项目'
+    const exportDir = join(wsDir, projectName)
+    mkdirSync(exportDir, { recursive: true })
+
     const bps = getAllBlueprints()
     const bpMap = new Map(bps.map(b => [b.chapterNumber, b]))
 
@@ -754,7 +792,7 @@ app.post('/api/export-finalized', async (req, res) => {
       const bp = bpMap.get(f.chapterNumber)
       const title = bp?.title || ''
       const safeTitle = title ? ` ${safeFilename(title)}` : ''
-      const filePath = `${cfg.projectPath}/第${f.chapterNumber}章${safeTitle}.txt`
+      const filePath = join(exportDir, `第${f.chapterNumber}章${safeTitle}.txt`)
       const titleLine = title
         ? `第${f.chapterNumber}章 ${title}\n\n`
         : `第${f.chapterNumber}章\n\n`
@@ -763,7 +801,7 @@ app.post('/api/export-finalized', async (req, res) => {
     }
 
     res.json({ ok: true, count: written, errors: errors.length ? errors : undefined,
-      message: `成功导出 ${written}/${finalized.length} 章` })
+      message: `成功导出 ${written}/${finalized.length} 章 → ${exportDir}` })
   } catch (e: any) {
     res.status(500).json({ error: e.message })
   }
@@ -780,6 +818,9 @@ app.get('/', (_req, res) => {
 })
 
 // ===== 启动 =====
+// 启动时自动迁移旧数据
+migrateFromLegacy()
+
 const PORT = parseInt(process.env.MIAOBI_UI_PORT || '3456')
 httpServer.listen(PORT, () => {
   console.log(`\n🚀 妙笔 UI 已启动 → http://localhost:${PORT}\n`)

@@ -145,9 +145,12 @@ body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: va
 <div id="landing">
   <div class="landing-logo">妙笔</div>
   <div class="landing-sub">AI 长篇商业小说创作引擎<br>全自动写稿·修稿·审稿·定稿流水线</div>
-  <div class="landing-btns">
-    <button class="landing-btn" onclick="landingNewProject()">📁 新建项目</button>
-    <button class="landing-btn alt" onclick="landingOpenProject()">📂 打开已有项目</button>
+  <div class="landing-btns" style="flex-direction:column;align-items:center;gap:12px">
+    <div style="display:flex;gap:8px">
+      <input id="landingProjectName" placeholder="输入项目名称..." style="padding:14px 20px;background:var(--surface2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-size:18px;width:320px;font-family:inherit" onkeydown="if(event.key==='Enter')landingNewProject()">
+      <button class="landing-btn" onclick="landingNewProject()">➕ 新建项目</button>
+    </div>
+    <div style="color:var(--text2);font-size:12px" id="landingWorkspaceHint"></div>
   </div>
   <div class="landing-recent" id="landingRecent"></div>
 </div>
@@ -210,7 +213,7 @@ body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: va
 
 <div class="main">
   <div class="topbar">
-    <span style="font-size:12px;color:var(--text2);flex-shrink:0">📂 最近项目</span> <select id="projectSelect" onchange="switchProject(this.value)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;min-width:340px" title="选择历史项目"><option value="">（选择项目）</option></select>
+    <span style="font-size:12px;color:var(--text2);flex-shrink:0">📖 项目</span> <select id="projectSelect" onchange="switchProject(this.value)" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;min-width:200px" title="选择项目"><option value="">（选择项目）</option></select>
     <button class="btn btn-secondary" onclick="showNewProjectDialog()" style="padding:4px 10px;font-size:11px;flex-shrink:0">+ 新建</button>
     <span style="font-size:13px;color:var(--text2)">|</span>
     <div style="display:flex;align-items:center;gap:6px"><span id="statusDot" class="dot red"></span><span id="statusText" class="status-text">检查中...</span></div>
@@ -274,22 +277,19 @@ body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: va
 
 <!-- New Project Modal -->
 <div id="newProjectModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center">
-  <div class="card" style="width:480px;max-height:90vh;overflow-y:auto">
-    <h3>📁 新建 / 打开项目</h3>
+  <div class="card" style="width:440px">
+    <h3>📁 新建项目</h3>
     <div class="form-group full" style="margin-bottom:12px">
       <label>项目名称</label>
-      <input id="newProjectName" placeholder="我的小说项目">
+      <input id="newProjectName" placeholder="我的小说项目" onkeydown="if(event.key==='Enter')createProject()">
     </div>
     <div class="form-group full" style="margin-bottom:12px">
-      <label>项目目录</label>
-      <div style="display:flex;gap:8px">
-        <input id="newProjectPath" placeholder="选择或输入项目目录..." style="flex:1">
-        <button class="btn btn-secondary" onclick="browseFolder()" style="padding:8px 16px;white-space:nowrap">📁 浏览...</button>
-      </div>
+      <label>存储位置</label>
+      <div style="color:var(--text2);font-size:12px;padding:8px;background:var(--surface2);border-radius:6px" id="newProjectPathDisplay">—</div>
     </div>
-    <div style="color:var(--text2);font-size:12px;margin-bottom:12px">如果目录不存在将自动创建。将在该目录下创建 .miaobi 数据库和 .env 配置。</div>
+    <div style="color:var(--text2);font-size:12px;margin-bottom:12px">所有数据存储在 .miaobi 数据库中，不创建 .env 文件。可在 LLM 设置中修改工作区目录。</div>
     <div class="btn-group">
-      <button class="btn btn-primary" onclick="createProject()">创建 / 打开</button>
+      <button class="btn btn-primary" onclick="createProject()">创建</button>
       <button class="btn btn-secondary" onclick="document.getElementById('newProjectModal').style.display='none'">取消</button>
     </div>
   </div>
@@ -363,7 +363,12 @@ async function showConfigView() {
     const keys = Object.keys(cfg)
     let html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
     html += `<span style="color:var(--text2);font-size:12px">共 ${keys.length} 项</span>`
-    html += '<button class="btn btn-secondary" style="padding:4px 12px;font-size:11px" onclick="selectTreeItem(document.querySelector(\'[data-id=arch-form]\'));showArchForm();">⚡ 生成架构</button>'
+    const phase = window._phase || 'init'
+    if (phase === 'blueprint' || phase === 'writing') {
+      html += '<span style="color:#f59e0b;font-size:12px">🔒 架构已锁定</span>'
+    } else {
+      html += '<button class="btn btn-secondary" style="padding:4px 12px;font-size:11px" onclick="selectTreeItem(document.querySelector(\'[data-id=arch-form]\'));showArchForm();">⚡ 生成架构</button>'
+    }
     html += '</div>'
     if (keys.length === 0) {
       html += '<div style="color:var(--text2);font-size:13px;padding:40px;text-align:center">暂无配置数据<br><button class="btn btn-primary" style="margin-top:16px" onclick="showConfigGenerateForm()">🚀 一键生成配置</button></div>'
@@ -405,12 +410,26 @@ async function showArchContent(key) {
   const data = window._archData || {}
   const content = data[key] || ''
   if (!content) {
-    showContentPanel(ARCH_LABELS[key]||key, '<div style="color:var(--text2);padding:40px;text-align:center">暂未生成<br><button class="btn btn-primary" style="margin-top:12px" onclick="showArchForm()">🚀 生成架构</button></div>')
+    const phase = window._phase || 'init'
+    const locked = phase === 'blueprint' || phase === 'writing'
+    const btnHtml = locked
+      ? '<span style="color:#f59e0b;font-size:13px">🔒 架构已锁定</span>'
+      : '<button class="btn btn-primary" style="margin-top:12px" onclick="showArchForm()">🚀 生成架构</button>'
+    showContentPanel(ARCH_LABELS[key]||key, `<div style="color:var(--text2);padding:40px;text-align:center">暂未生成<br>${btnHtml}</div>`)
     return
   }
   showContentPanel(ARCH_LABELS[key]||key, `<div style="white-space:pre-wrap;line-height:2">${esc(content.substring(0, 10000))}${content.length>10000?'...':''}</div>`)
 }
 function showArchForm() {
+  const phase = window._phase || 'init'
+  if (phase === 'blueprint' || phase === 'writing') {
+    showFormPanel(`<div class="card" style="border-color: #f59e0b;">
+      <h3>🔒 故事架构已锁定</h3>
+      <p style="color:var(--text2);font-size:13px;padding:20px 0">已进入${phase === 'writing' ? '写稿' : '蓝图生成'}阶段，故事架构已锁定，不可修改。</p>
+      <p style="color:var(--text2);font-size:12px">如需修改架构，需要重建项目数据。</p>
+    </div>`)
+    return
+  }
   showFormPanel(`<div class="card">
     <h3>🏗️ 故事架构四步生成</h3>
     <div class="step-checks" style="margin-bottom:16px">
@@ -432,9 +451,35 @@ async function loadArchitectDisplay() {
     const r = await fetch('/api/project-core'); const data = await r.json()
     window._archData = data
     const steps = ['premise', 'characters', 'worldbuilding', 'synopsis']
+    const phase = window._phase || 'init'
+    const archLocked = phase === 'blueprint' || phase === 'writing'
     for (const k of steps) {
       const el = document.querySelector(`[data-arch="${k}"] .status-icon`)
-      if (el) el.textContent = data[k] ? '✅' : '⬜'
+      if (el) {
+        if (archLocked) {
+          el.textContent = data[k] ? '🔒' : '🔒'
+        } else {
+          el.textContent = data[k] ? '✅' : '⬜'
+        }
+      }
+    }
+    // Lock the "生成架构" parent item
+    const archParent = document.querySelector('[data-id="architect"]')
+    if (archParent) {
+      let lockIcon = archParent.querySelector('.lock-icon')
+      if (archLocked) {
+        if (!lockIcon) {
+          lockIcon = document.createElement('span')
+          lockIcon.className = 'lock-icon'
+          lockIcon.textContent = '🔒'
+          lockIcon.style.cssText = 'margin-left:4px;font-size:12px'
+          // insert after label
+          const label = archParent.querySelector('.label')
+          if (label) label.after(lockIcon)
+        }
+      } else {
+        if (lockIcon) lockIcon.remove()
+      }
     }
     const completed = steps.filter(k => data[k]).length
     if (completed > 0) {
@@ -481,6 +526,20 @@ async function loadCharacterList() {
 
 // ======== Blueprints ========
 function showBPForm() {
+  const phase = window._phase || 'init'
+  if (phase === 'writing') {
+    showFormPanel(`<div class="card" style="border-color: #f59e0b;">
+      <h3>🔒 章节蓝图已锁定</h3>
+      <p style="color:var(--text2);font-size:13px;padding:20px 0">已进入写稿阶段，章节蓝图已锁定，不可修改。</p>
+      <p style="color:var(--text2);font-size:12px">如需修改蓝图，需要先删除所有草稿。</p>
+    </div>
+    <div class="card">
+      <h3>已有蓝图</h3>
+      <div id="bp-list-inline" style="max-height:400px;overflow-y:auto"><span style="color:var(--text2)">加载中...</span></div>
+    </div>`)
+    loadBPListInline()
+    return
+  }
   showFormPanel(`<div class="card">
     <h3>📋 章节蓝图生成</h3>
     <div class="form-grid" style="margin-bottom:12px">
@@ -510,6 +569,24 @@ async function loadBlueprints() {
   try {
     const r = await fetch('/api/blueprints'); const bps = await r.json()
     document.getElementById('tree-bp-badge').textContent = bps.length ? bps.length + '章' : ''
+    // Add lock icon to blueprint parent if writing phase
+    const phase = window._phase || 'init'
+    const bpParent = document.querySelector('[data-id="blueprints"]')
+    if (bpParent) {
+      let lockIcon = bpParent.querySelector('.lock-icon')
+      if (phase === 'writing') {
+        if (!lockIcon) {
+          lockIcon = document.createElement('span')
+          lockIcon.className = 'lock-icon'
+          lockIcon.textContent = '🔒'
+          lockIcon.style.cssText = 'margin-left:4px;font-size:12px'
+          const label = bpParent.querySelector('.label')
+          if (label) label.after(lockIcon)
+        }
+      } else {
+        if (lockIcon) lockIcon.remove()
+      }
+    }
     const container = document.getElementById('tree-bp-children')
     if (!container) return
     container.querySelectorAll('.tree-item.lvl-1[data-type="bp-chapter"]').forEach(e => e.remove())
@@ -537,8 +614,13 @@ async function showBPDetail(ch) {
       return;
     }
     let html = '<div class="btn-group" style="margin-bottom:16px">'
-    html += `<button class="btn btn-primary" onclick="showWriteForm(${ch})">✍️ 基于此蓝图写稿</button>`
-    html += '<button class="btn btn-green" onclick="showOneClickForm(' + ch + ')">🚀 一键完成本章</button>'
+    const isFinalized = window._finalizedChapters && window._finalizedChapters.has(ch)
+    if (isFinalized) {
+      html += '<span style="color:#f59e0b;font-size:13px">🔒 本章已定稿，写稿/修稿/审稿已锁定</span>'
+    } else {
+      html += `<button class="btn btn-primary" onclick="showWriteForm(${ch})">✍️ 基于此蓝图写稿</button>`
+      html += '<button class="btn btn-green" onclick="showOneClickForm(' + ch + ')">🚀 一键完成本章</button>'
+    }
     html += '</div>'
     html += '<div style="display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:13px;line-height:1.8">'
     html += `<div style="color:var(--text2)">章节号</div><div>第${esc(bp.chapterNumber)}章</div>`
@@ -604,14 +686,21 @@ async function viewDraft(ch, ver) {
     if (d.content) {
       const wc = (d.content || '').replace(/\s/g, '').length
       const statusText = { draft: '草稿', reviewed: '已审', refined: '已修', finalized: '定稿' }
-      showContentPanel(`✍️ 第${ch}章 ${statusText[d.status] || d.status || '草稿'} v${ver} (${wc}字)`,
-        `<div style="white-space:pre-wrap;line-height:2">${esc(d.content || '')}</div>
-        <div class="btn-group" style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
-          <button class="btn btn-secondary" onclick="showWriteForm(${ch})">✍️ 写新草稿</button>
+      const isFinalized = window._finalizedChapters && window._finalizedChapters.has(ch)
+      let btnHtml = ''
+      if (isFinalized) {
+        btnHtml = '<span style="color:#f59e0b;font-size:13px">🔒 本章已定稿，无法进行写稿/修稿/审稿操作</span>'
+      } else {
+        btnHtml = `<button class="btn btn-secondary" onclick="showWriteForm(${ch})">✍️ 写新草稿</button>
           <button class="btn btn-secondary" onclick="refineChapterById(${ch})">🔧 AI 修稿</button>
           <button class="btn btn-secondary" onclick="reviewChapterById(${ch})">🔍 一致性审稿</button>
           <button class="btn btn-primary" onclick="finalizeChapterById(${ch})">✅ 定稿</button>
-          <button class="btn btn-green" onclick="showOneClickForm(${ch})">🚀 一键完成</button>
+          <button class="btn btn-green" onclick="showOneClickForm(${ch})">🚀 一键完成</button>`
+      }
+      showContentPanel(`✍️ 第${ch}章 ${statusText[d.status] || d.status || '草稿'} v${ver} (${wc}字)`,
+        `<div style="white-space:pre-wrap;line-height:2">${esc(d.content || '')}</div>
+        <div class="btn-group" style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+          ${btnHtml}
         </div>`)
     } else {
       showContentPanel(`✍️ 第${ch}章 草稿 v${ver}`, '<div style="color:var(--text2);padding:40px;text-align:center">内容为空</div>')
@@ -632,6 +721,14 @@ async function viewFinalized(ch) {
 
 // ======== Write Form ========
 function showWriteForm(ch) {
+  // Guard: finalized chapter
+  if (ch && window._finalizedChapters && window._finalizedChapters.has(ch)) {
+    showFormPanel(`<div class="card" style="border-color: #f59e0b;">
+      <h3>🔒 第${ch}章已定稿</h3>
+      <p style="color:var(--text2);font-size:13px;padding:20px 0">本章已定稿，草稿/修稿/审稿操作已锁定。</p>
+    </div>`)
+    return
+  }
   showFormPanel(`<div class="card">
     <h3>✍️ 撰写章节草稿</h3>
     <div class="form-grid">
@@ -658,6 +755,13 @@ function oneClickFromWrite() {
 
 // ======== One-Click (standalone) ========
 function showOneClickForm(ch) {
+  if (ch && window._finalizedChapters && window._finalizedChapters.has(ch)) {
+    showFormPanel(`<div class="card" style="border-color: #f59e0b;">
+      <h3>🔒 第${ch}章已定稿</h3>
+      <p style="color:var(--text2);font-size:13px;padding:20px 0">本章已定稿，一键完成操作不可用。</p>
+    </div>`)
+    return
+  }
   showFormPanel(`<div class="card" style="border-color: var(--accent);">
     <h3>🚀 一键完成 — 写稿→修稿→审稿→修复→定稿</h3>
     <p style="color:var(--text2);font-size:13px;margin-bottom:12px">5 步全自动，无需人工干预</p>
@@ -697,16 +801,19 @@ async function finalizeChapter() { finalizeChapterById(parseInt(document.getElem
 
 async function refineChapterById(ch) {
   if (!ch) return showToast('请输入章节号', 'error')
+  if (window._finalizedChapters && window._finalizedChapters.has(ch)) return showToast(`第${ch}章已定稿，修稿已锁定`, 'error')
   clearLogs(); appendLog('step', `修稿 第${ch}章...`)
   await apiPost('/api/refine', { chapterNumber: ch }, `第${ch}章修稿已启动`)
 }
 async function reviewChapterById(ch) {
   if (!ch) return showToast('请输入章节号', 'error')
+  if (window._finalizedChapters && window._finalizedChapters.has(ch)) return showToast(`第${ch}章已定稿，审稿已锁定`, 'error')
   clearLogs(); appendLog('step', `审稿 第${ch}章...`)
   await apiPost('/api/review', { chapterNumber: ch }, `第${ch}章审稿已启动`)
 }
 async function finalizeChapterById(ch) {
   if (!ch) return showToast('请输入章节号', 'error')
+  if (window._finalizedChapters && window._finalizedChapters.has(ch)) return showToast(`第${ch}章已定稿，不可重复定稿`, 'error')
   const title = document.getElementById('post-title')?.value
   clearLogs(); appendLog('step', `定稿 第${ch}章...`)
   await apiPost('/api/finalize', { chapterNumber: ch, title: title || undefined }, `第${ch}章定稿已启动`)
@@ -728,6 +835,7 @@ function showSettingsView() {
       <div class="form-group"><label>模型名称</label><input id="settings-model" placeholder="deepseek-v4-pro"></div>
       <div class="form-group"><label>每章默认字数</label><input id="settings-wordsPerChapter" type="number" value="3000" min="500" max="20000"></div>
       <div class="form-group"><label>默认总章数</label><input id="settings-totalChapters" type="number" value="100" min="10" max="5000"></div>
+      <div class="form-group full"><label>工作区目录</label><input id="settings-workspaceDir" placeholder="新建项目的默认父目录"><div style="font-size:11px;color:var(--text2);margin-top:4px">新建项目时将在此目录下自动生成项目文件夹</div></div>
     </div>
     <div class="btn-group" style="margin-top:12px">
       <button class="btn btn-primary" onclick="saveSettings()">保存设置</button>
@@ -767,6 +875,7 @@ async function loadSettingsValues() {
     set('settings-embedBaseUrl', c.embeddingBaseUrl || '')
     set('settings-embedApiKey', c.embeddingApiKey || '')
     set('settings-embedModel', c.embeddingModel || '')
+    set('settings-workspaceDir', c.workspaceDir || '')
     const wpc = document.getElementById('settings-wordsPerChapter'); if (wpc) wpc.value = c.wordsPerChapter || 3000
     const tc = document.getElementById('settings-totalChapters'); if (tc) tc.value = c.totalChapters || 100
     const info = document.getElementById('settings-info')
@@ -874,7 +983,7 @@ async function loadProjects() {
     const r = await fetch('/api/projects'); const d = await r.json()
     const sel = document.getElementById('projectSelect')
     sel.innerHTML = (d.projects || []).length > 0
-      ? d.projects.map(p => `<option value="${esc(p.path)}" ${p.path === d.currentPath ? 'selected' : ''}>${esc(p.name)} — ${esc(p.path)}</option>`).join('')
+      ? d.projects.map(p => `<option value="${esc(p.path)}" ${p.path === d.currentPath ? 'selected' : ''}>${esc(p.name)}</option>`).join('')
       : '<option value="">（无项目）</option>'
     refreshStatus()
   } catch (e) {}
@@ -882,7 +991,7 @@ async function loadProjects() {
 
 async function switchProject(path) {
   if (!path) return
-  if (!confirm('切换项目将刷新所有状态，确认切换到：' + path + '？')) { loadProjects(); return }
+  if (!confirm('切换到该项目？')) { loadProjects(); return }
   try {
     const r = await fetch('/api/projects/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) })
     if (!r.ok) { const e = await r.json(); showToast('切换失败: ' + e.error, 'error'); loadProjects(); return }
@@ -897,7 +1006,23 @@ async function switchProject(path) {
 function showNewProjectDialog() {
   document.getElementById('newProjectModal').style.display = 'flex'
   document.getElementById('newProjectName').focus()
+  updateNewProjectPath()
 }
+async function updateNewProjectPath() {
+  try {
+    const r = await fetch('/api/settings'); const c = await r.json()
+    const name = document.getElementById('newProjectName').value.trim() || '我的小说项目'
+    const safeName = name.replace(/[<>:"/\\|?*]/g, '_').trim()
+    const ws = c.workspaceDir || '（未设置）'
+    const display = document.getElementById('newProjectPathDisplay')
+    if (display) display.textContent = ws + '/' + safeName
+  } catch(e) { const display = document.getElementById('newProjectPathDisplay'); if (display) display.textContent = '—' }
+}
+// Realtime preview of generated path
+document.addEventListener('DOMContentLoaded', () => {
+  const nameInput = document.getElementById('newProjectName')
+  if (nameInput) nameInput.addEventListener('input', updateNewProjectPath)
+})
 
 // ======== Landing ========
 async function loadLandingRecent() {
@@ -907,24 +1032,31 @@ async function loadLandingRecent() {
     const el = document.getElementById('landingRecent')
     if (!projects.length) { el.innerHTML = ''; return }
     el.innerHTML = '<div style="color:var(--text2);font-size:12px;margin-bottom:6px">最近项目 — 点击快速打开</div>'
-      + projects.map(p => `<div class="recent-item" onclick="landingOpenRecent('${esc(p.path)}')"><span>📂</span><span class="name">${esc(p.name)}</span><span class="path">${esc(p.path)}</span></div>`).join('')
+      + projects.map(p => `<div class="recent-item" onclick="landingOpenRecent('${esc(p.path)}')"><span>📖</span><span class="name">${esc(p.name)}</span></div>`).join('')
+    // 显示工作区路径
+    try {
+      const sr = await fetch('/api/settings'); const sc = await sr.json()
+      const wh = document.getElementById('landingWorkspaceHint')
+      if (wh) wh.textContent = '项目将创建在：' + (sc.workspaceDir || '（未设置）')
+    } catch(e) {}
   } catch (e) {}
 }
 async function landingNewProject() {
-  document.getElementById('newProjectModal').style.display = 'flex'
-  document.getElementById('newProjectName').focus()
-  const selectedPath = await browseFolder()
-  if (selectedPath) {
-    document.getElementById('newProjectPath').value = selectedPath
-    const defaultName = pathBasename(selectedPath) || '我的小说'
-    if (!document.getElementById('newProjectName').value) document.getElementById('newProjectName').value = defaultName
+  const name = document.getElementById('landingProjectName').value.trim()
+  if (!name) {
+    document.getElementById('newProjectModal').style.display = 'flex'
+    document.getElementById('newProjectName').focus()
+    updateNewProjectPath()
+    return
   }
+  await createProjectFromName(name)
 }
-async function landingOpenProject() {
-  document.getElementById('newProjectModal').style.display = 'flex'
-  document.getElementById('newProjectPath').focus()
-  const selectedPath = await browseFolder()
-  if (selectedPath) { document.getElementById('newProjectPath').value = selectedPath; createProject() }
+async function createProjectFromName(name) {
+  try {
+    const r = await fetch('/api/projects/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    if (!r.ok) { const e = await r.json(); showToast('创建失败: ' + e.error, 'error'); return }
+    showToast('项目已创建', 'success'); loadProjects()
+  } catch (e) { showToast('网络错误', 'error') }
 }
 async function landingOpenRecent(path) {
   if (!path) return
@@ -936,30 +1068,19 @@ async function landingOpenRecent(path) {
 }
 async function createProject() {
   const name = document.getElementById('newProjectName').value.trim()
-  const path = document.getElementById('newProjectPath').value.trim()
-  if (!path) return showToast('请输入项目目录路径', 'error')
+  if (!name) return showToast('请输入项目名称', 'error')
   document.getElementById('newProjectModal').style.display = 'none'
   try {
-    const r = await fetch('/api/projects/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, name: name || undefined }) })
+    const r = await fetch('/api/projects/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
     if (!r.ok) { const e = await r.json(); showToast('创建失败: ' + e.error, 'error'); return }
     showToast('项目已创建', 'success'); loadProjects()
   } catch (e) { showToast('网络错误', 'error') }
 }
 let _browsing = false
 async function browseFolder() {
-  if (_browsing) return ''
-  _browsing = true
-  const btn = document.querySelector('#newProjectModal button[onclick="browseFolder()"]')
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 选择中...' }
-  try {
-    const r = await fetch('/api/dialog/select-folder', { method: 'POST' })
-    const d = await r.json()
-    if (!r.ok) { showToast('打开对话框失败: ' + d.error, 'error'); return '' }
-    if (d.cancelled) return ''
-    document.getElementById('newProjectPath').value = d.path
-    return d.path
-  } catch (e) { showToast('打开对话框失败', 'error'); return '' }
-  finally { _browsing = false; if (btn) { btn.disabled = false; btn.textContent = '📁 浏览...' } }
+  // 不再使用原生文件夹对话框 — 项目通过工作区目录自动管理
+  showToast('项目路径由名称自动生成，请在 LLM 设置中修改工作区目录', 'info')
+  return ''
 }
 
 // ======== Status ========
@@ -979,6 +1100,11 @@ async function refreshStatus() {
     document.getElementById('statusText').textContent = s.llmConfigured ? `已连接 (${s.model})` : '未配置 LLM'
     let parts = [`目录: ${pathBasename(s.projectPath)}`]
     if (s.configItems > 0) parts.push(`⚙️配置(${s.configItems}项)`)
+    // Store global phase & lock state for UI guards
+    window._phase = s.phase || 'init'
+    window._finalizedChapters = new Set(s.finalizedChapterNumbers || [])
+    window._draftChapters = new Set(s.draftChapterNumbers || [])
+
     if (s.architectureSteps.length > 0) parts.push(`🏗️架构已完成`)
     if (s.totalPlanned > 0) parts.push(`📋蓝图${s.totalPlanned}章`)
     if (s.characterCount > 0) parts.push(`👤角色${s.characterCount}人`)
@@ -1033,6 +1159,7 @@ async function generateBlueprint() {
 async function writeChapter() {
   const ch = parseInt(document.getElementById('write-ch').value)
   if (!ch) return showToast('请输入章节号', 'error')
+  if (window._finalizedChapters && window._finalizedChapters.has(ch)) return showToast(`第${ch}章已定稿，写稿已锁定`, 'error')
   clearLogs(); appendLog('step', `撰写第${ch}章...`)
   await apiPost('/api/write', {
     chapterNumber: ch,
@@ -1048,6 +1175,7 @@ async function writeChapter() {
 async function oneClick() {
   const ch = parseInt(document.getElementById('oc-ch').value)
   if (!ch) return showToast('请输入章节号', 'error')
+  if (window._finalizedChapters && window._finalizedChapters.has(ch)) return showToast(`第${ch}章已定稿，一键完成已锁定`, 'error')
   clearLogs(); appendLog('step', `一键完成 第${ch}章...`)
   await apiPost('/api/one-click', {
     chapterNumber: ch,
@@ -1101,6 +1229,7 @@ async function saveSettings() {
     embeddingModel: document.getElementById('settings-embedModel').value.trim(),
     wordsPerChapter: parseInt(document.getElementById('settings-wordsPerChapter').value) || 3000,
     totalChapters: parseInt(document.getElementById('settings-totalChapters').value) || 100,
+    workspaceDir: document.getElementById('settings-workspaceDir').value.trim(),
   }
   try {
     const r = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

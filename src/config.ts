@@ -1,64 +1,28 @@
-import { config } from 'dotenv'
-import { resolve, join, normalize } from 'node:path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { resolve, join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  getGlobalDb, closeGlobalDb,
+  listProjects as globalListProjects,
+  registerProject as globalRegisterProject,
+  getAllProjectConfig, setProjectConfigs, readLegacyEnvConfig,
+  type ProjectEntry,
+} from './global-db.js'
 
-// ===== 全局项目注册表 =====
-const GLOBAL_DIR = join(homedir(), '.miaobi')
-const REGISTRY_PATH = join(GLOBAL_DIR, 'projects.json')
+export type { ProjectEntry }
 
-/** 路径标准化：去掉末尾分隔符、统一反斜杠 */
+/** 路径标准化：去掉末尾分隔符、统一正斜杠 */
 function normPath(p: string): string {
   return resolve(p).replace(/\\/g, '/').replace(/\/+$/, '')
 }
 
-export interface ProjectEntry {
-  name: string
-  path: string
-  lastOpened: string  // ISO date string
-  createdAt: string
-}
-
-function readRegistry(): ProjectEntry[] {
-  try {
-    if (existsSync(REGISTRY_PATH)) {
-      return JSON.parse(readFileSync(REGISTRY_PATH, 'utf-8'))
-    }
-  } catch { /* ignore */ }
-  return []
-}
-
-function writeRegistry(entries: ProjectEntry[]): void {
-  mkdirSync(GLOBAL_DIR, { recursive: true })
-  writeFileSync(REGISTRY_PATH, JSON.stringify(entries, null, 2), 'utf-8')
-}
+// ===== 全局项目注册表（委托给 global-db） =====
 
 export function listProjects(): ProjectEntry[] {
-  return readRegistry()
+  return globalListProjects()
 }
 
 export function registerProject(projectPath: string, name?: string): ProjectEntry {
-  const normalized = normPath(projectPath)
-  const entries = readRegistry()
-  // 也标准化已有条目路径以防止旧脏数据
-  for (const e of entries) e.path = normPath(e.path)
-  const existing = entries.find(e => e.path === normalized)
-  const now = new Date().toISOString()
-  if (existing) {
-    existing.lastOpened = now
-    if (name) existing.name = name
-    writeRegistry(entries)
-    return existing
-  }
-  const entry: ProjectEntry = {
-    name: name || normalized.split('/').pop() || normalized,
-    path: normalized,
-    lastOpened: now,
-    createdAt: now,
-  }
-  entries.push(entry)
-  writeRegistry(entries)
-  return entry
+  return globalRegisterProject(projectPath, name)
 }
 
 // ===== 动态配置 =====
@@ -82,33 +46,44 @@ export interface MiaobiConfig {
   projectPath: string
 }
 
-/** 重新加载项目 .env + 重建配置缓存 */
+/** 加载项目配置（优先全局 DB，回退旧 .env，最后硬编码默认值） */
 function loadConfig(projectPath: string): MiaobiConfig {
-  const envPath = resolve(projectPath, '.env')
-  if (existsSync(envPath)) {
-    config({ path: envPath, override: true })
+  const normalized = normPath(projectPath)
+  const miaobiHome = join(normalized, '.miaobi')
+  mkdirSync(miaobiHome, { recursive: true })
+
+  // 1. 尝试从全局 DB 读取
+  const dbConfig = getAllProjectConfig(normalized)
+
+  // 2. 如果全局 DB 无配置，尝试回退读取旧 .env
+  let fallback: Record<string, string> = {}
+  if (Object.keys(dbConfig).length === 0) {
+    fallback = readLegacyEnvConfig(normalized)
   }
 
-  const miaobiHome = process.env.MIAOBI_HOME || join(projectPath, '.miaobi')
-  mkdirSync(miaobiHome, { recursive: true })
+  const get = (key: string, defaultVal: string): string => {
+    if (dbConfig[key]) return dbConfig[key]
+    if (fallback[key]) return fallback[key]
+    return defaultVal
+  }
 
   return {
     llm: {
-      baseUrl: process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
-      apiKey: process.env.LLM_API_KEY || '',
-      model: process.env.LLM_MODEL || 'gpt-4o',
+      baseUrl: get('LLM_BASE_URL', 'https://api.openai.com/v1'),
+      apiKey: get('LLM_API_KEY', ''),
+      model: get('LLM_MODEL', 'gpt-4o'),
       embedding: {
-        baseUrl: process.env.EMBEDDING_BASE_URL || process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
-        apiKey: process.env.EMBEDDING_API_KEY || process.env.LLM_API_KEY || '',
-        model: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
+        baseUrl: get('EMBEDDING_BASE_URL', get('LLM_BASE_URL', 'https://api.openai.com/v1')),
+        apiKey: get('EMBEDDING_API_KEY', get('LLM_API_KEY', '')),
+        model: get('EMBEDDING_MODEL', 'text-embedding-3-small'),
       },
     },
     writing: {
-      wordsPerChapter: parseInt(process.env.DEFAULT_WORDS_PER_CHAPTER || '3000'),
-      totalChapters: parseInt(process.env.DEFAULT_TOTAL_CHAPTERS || '100'),
+      wordsPerChapter: parseInt(get('DEFAULT_WORDS_PER_CHAPTER', '3000')),
+      totalChapters: parseInt(get('DEFAULT_TOTAL_CHAPTERS', '100')),
     },
     miaobiHome,
-    projectPath,
+    projectPath: normalized,
   }
 }
 
@@ -141,7 +116,6 @@ export function getConfig(): MiaobiConfig {
 
 /** 切换到另一个项目（会清空 DB 连接） */
 export function switchProject(projectPath: string): MiaobiConfig {
-  // 通知外部先关闭 DB（避免跨项目连接错乱）
   // caller 负责先调 closeDb()
   const normalized = normPath(projectPath)
   _noProject = false
@@ -159,6 +133,8 @@ export function updateConfig(partial: Partial<MiaobiConfig['llm'] & MiaobiConfig
   embeddingBaseUrl?: string; embeddingApiKey?: string; embeddingModel?: string
 }>): void {
   const cfg = getConfig()
+  if (!cfg.projectPath) return // 无项目时不能更新
+
   if (partial.baseUrl !== undefined) cfg.llm.baseUrl = partial.baseUrl
   if (partial.apiKey !== undefined) cfg.llm.apiKey = partial.apiKey
   if (partial.model !== undefined) cfg.llm.model = partial.model
@@ -168,19 +144,37 @@ export function updateConfig(partial: Partial<MiaobiConfig['llm'] & MiaobiConfig
   if (partial.wordsPerChapter !== undefined) cfg.writing.wordsPerChapter = partial.wordsPerChapter
   if (partial.totalChapters !== undefined) cfg.writing.totalChapters = partial.totalChapters
 
-  // 写回 .env 文件，确保重启后配置不丢失
-  if (cfg.projectPath) {
-    writeEnvFile(cfg)
-  }
+  // 写入全局 DB
+  const entries: Record<string, string> = {}
+  if (cfg.llm.baseUrl) entries['LLM_BASE_URL'] = cfg.llm.baseUrl
+  if (cfg.llm.apiKey) entries['LLM_API_KEY'] = cfg.llm.apiKey
+  if (cfg.llm.model) entries['LLM_MODEL'] = cfg.llm.model
+  if (cfg.llm.embedding.baseUrl) entries['EMBEDDING_BASE_URL'] = cfg.llm.embedding.baseUrl
+  if (cfg.llm.embedding.apiKey) entries['EMBEDDING_API_KEY'] = cfg.llm.embedding.apiKey
+  if (cfg.llm.embedding.model) entries['EMBEDDING_MODEL'] = cfg.llm.embedding.model
+  entries['DEFAULT_WORDS_PER_CHAPTER'] = String(cfg.writing.wordsPerChapter)
+  entries['DEFAULT_TOTAL_CHAPTERS'] = String(cfg.writing.totalChapters)
+
+  setProjectConfigs(cfg.projectPath, entries)
+
+  // 同步写回旧 .env 文件（向后兼容：已有项目可能依赖 .env 文件）
+  // 新项目不再创建 .env，但已有项目保持同步
+  syncLegacyEnvFile(cfg)
 }
 
-function writeEnvFile(cfg: MiaobiConfig): void {
+/** 向旧 .env 文件同步写回配置（向后兼容已有项目） */
+function syncLegacyEnvFile(cfg: MiaobiConfig): void {
   const envPath = resolve(cfg.projectPath, '.env')
-  // 读取现有 .env 文件，保留注释和非 LLM/WRITING 相关行
+
   let existing = ''
   if (existsSync(envPath)) {
-    existing = readFileSync(envPath, 'utf-8')
+    try {
+      existing = readFileSync(envPath, 'utf-8')
+    } catch { /* ignore */ }
   }
+
+  // 如果 .env 不存在，不创建新的（新项目完全走数据库）
+  if (!existing) return
 
   const envLines = existing.split(/\r?\n/)
   const replacementMap: Record<string, string> = {
@@ -199,7 +193,6 @@ function writeEnvFile(cfg: MiaobiConfig): void {
 
   for (const line of envLines) {
     const trimmed = line.trim()
-    // 保留空行和注释
     if (!trimmed || trimmed.startsWith('#')) {
       result.push(line)
       continue
@@ -218,14 +211,15 @@ function writeEnvFile(cfg: MiaobiConfig): void {
     }
   }
 
-  // 追加新键
   for (const [key, value] of Object.entries(replacementMap)) {
     if (!updatedKeys.has(key)) {
       result.push(`${key}=${value}`)
     }
   }
 
-  writeFileSync(envPath, result.join('\n') + '\n', 'utf-8')
+  try {
+    writeFileSync(envPath, result.join('\n') + '\n', 'utf-8')
+  } catch { /* 写入失败不影响主流程 */ }
 }
 
 export function validateConfig(): string[] {
@@ -233,7 +227,7 @@ export function validateConfig(): string[] {
   const cfg = getConfig()
 
   if (!cfg.llm.apiKey) {
-    errors.push('LLM_API_KEY 未设置。请在 .env 文件中配置 API 密钥')
+    errors.push('LLM_API_KEY 未设置。请在 Web UI 设置中配置 API 密钥')
   }
   if (!cfg.llm.baseUrl) {
     errors.push('LLM_BASE_URL 未设置')

@@ -5,14 +5,12 @@ import { BaseCommand, type StepContext, type StepCallbacks } from './base-comman
 import { getPromptTemplate } from '../prompts.js'
 import { PostProcessPromptBuilder } from '../builder.js'
 import { callLLM } from '../llm.js'
-import { parseJSON, safeFilename } from '../utils.js'
+import { parseJSON } from '../utils.js'
 import {
   getLatestDraft, updateDraftStatus,
   getProjectCore, getAllCharacters, saveCharacter, updateCharacterState,
   getConfigValue, getBlueprint, type Character, type CharacterState,
 } from '../database.js'
-import { writeFileSync, mkdirSync } from 'node:fs'
-import { getConfig } from '../config.js'
 import { chunkChapterText, embedChunks } from '../embedding.js'
 import { storeChapterChunks, deleteChapterChunks, getVectorStats } from '../vector-db.js'
 
@@ -31,8 +29,6 @@ export class FinalizeChapterCommand extends BaseCommand<void> {
   async execute(_context: StepContext, callbacks: StepCallbacks): Promise<void> {
     callbacks.log('\n===== 开始定稿与后处理分析 =====')
 
-    const cfg = getConfig()
-
     // 1. 标记定稿
     const draft = getLatestDraft(this.params.chapterNumber)
     if (!draft) throw new Error(`第 ${this.params.chapterNumber} 章无草稿`)
@@ -43,17 +39,7 @@ export class FinalizeChapterCommand extends BaseCommand<void> {
     this.params.draftContent = content
 
     updateDraftStatus(draft.id, 'finalized')
-
-    // 2. 写入物理文件
-    const safeTitle = this.params.chapterTitle
-      ? ` ${safeFilename(this.params.chapterTitle)}`
-      : ''
-    const physicalPath = `${cfg.projectPath}/第${this.params.chapterNumber}章${safeTitle}.txt`
-    const titleLine = this.params.chapterTitle
-      ? `第${this.params.chapterNumber}章 ${this.params.chapterTitle}\n\n`
-      : `第${this.params.chapterNumber}章\n\n`
-    writeFileSync(physicalPath, titleLine + content.replace(/^#+ .*\n*/, ''), 'utf-8')
-    callbacks.log(`✅ 定稿已写入: ${physicalPath}`)
+    callbacks.log('✅ 已标记为定稿（内容仅存储在数据库中）')
 
     // 3. 后处理步骤
     callbacks.log('🚀 正在执行后处理分析...')

@@ -10,13 +10,14 @@
  *   miaobi write <N>        撰写第 N 章草稿
  *   miaobi refine <N>       AI 修稿
  *   miaobi review <N>       一致性审稿
- *   miaobi finalize <N>     定稿 + 后处理
+ *   miaobi finalize <N>     定稿 + 后处理分析（内容存储在数据库）
  *   miaobi one-click <N>    一键完成（写稿→修稿→审稿→修复→定稿）
  *   miaobi repair <N>       修复定稿
  *   miaobi import           批量导入已有章节
  */
 import { Command } from 'commander'
 import { getConfig, validateConfig } from './config.js'
+import { migrateFromLegacy, registerProject, setProjectConfigs } from './global-db.js'
 import { getDb, getBlueprint, getLatestDraft } from './database.js'
 import {
   executeWorkflow, type WorkflowCallbacks,
@@ -65,34 +66,28 @@ program.command('init')
     fs.mkdirSync(miaobiDir, { recursive: true })
     fs.mkdirSync(promptsDir, { recursive: true })
 
-    // 创建默认 .env
-    const envPath = path.join(projectPath, '.env')
-    if (!fs.existsSync(envPath)) {
-      const envContent = `# 妙笔配置
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_API_KEY=sk-your-key-here
-LLM_MODEL=gpt-4o
+    // 注册到全局数据库（不再创建 .env 文件，配置通过 Web UI 设置）
+    registerProject(projectPath)
 
-# 写作默认值
-DEFAULT_WORDS_PER_CHAPTER=3000
-DEFAULT_TOTAL_CHAPTERS=100
-
-# 妙笔目录（相对于项目根目录）
-MIAOBI_HOME=${miaobiDir}
-`
-      fs.writeFileSync(envPath, envContent, 'utf-8')
-      console.log(`✅ 已创建 .env 配置文件: ${envPath}`)
-    } else {
-      console.log(`⚠️  .env 已存在，跳过: ${envPath}`)
-    }
+    // 写入默认配置条目（空白值，用户通过 Web UI 填写）
+    setProjectConfigs(projectPath, {
+      'LLM_BASE_URL': 'https://api.openai.com/v1',
+      'LLM_API_KEY': '',
+      'LLM_MODEL': 'gpt-4o',
+      'DEFAULT_WORDS_PER_CHAPTER': '3000',
+      'DEFAULT_TOTAL_CHAPTERS': '100',
+      'EMBEDDING_BASE_URL': 'https://api.openai.com/v1',
+      'EMBEDDING_API_KEY': '',
+      'EMBEDDING_MODEL': 'text-embedding-3-small',
+    })
 
     // 初始化数据库
     process.chdir(projectPath)
     getDb()
     console.log(`✅ 妙笔数据库已初始化: ${path.join(miaobiDir, 'miaobi.db')}`)
     console.log(`\n🎉 项目初始化完成！下一步：
-  1. 编辑 .env 配置 API 密钥
-  2. 运行 "miaobi config <你的灵感>" 生成商业小说配置
+  1. 启动 Web UI 配置 API 密钥: miaobi ui
+  2. 或运行 "miaobi config <你的灵感>" 生成商业小说配置
   3. 运行 "miaobi architect" 生成故事架构`)
   })
 
@@ -272,7 +267,7 @@ program.command('review')
 // ===== finalize =====
 
 program.command('finalize')
-  .description('定稿并写入物理文件 + 后处理分析')
+  .description('定稿 + 后处理分析（内容存储在数据库中）')
   .argument('<chapterNumber>', '章节号')
   .option('-t, --title <title>', '章标题')
   .action(async (chapterNum, opts) => {
@@ -421,5 +416,8 @@ program.command('import')
   })
 
 // ===== 解析 =====
+
+// 启动时自动迁移旧数据（projects.json + .env → 全局数据库）
+migrateFromLegacy()
 
 program.parse()
